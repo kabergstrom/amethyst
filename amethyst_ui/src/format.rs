@@ -14,7 +14,7 @@ pub type FontHandle = Handle<FontAsset>;
 pub struct FontData(Font<'static>);
 
 impl Asset for FontAsset {
-    const NAME: &'static str = "ui::Font";
+    fn name() -> &'static str { "ui::Font"}
     type Data = FontData;
     type HandleStorage = VecStorage<Handle<Self>>;
 }
@@ -43,7 +43,7 @@ pub type OtfFormat = TtfFormat;
 pub struct TtfFormat;
 
 impl SimpleFormat<FontAsset> for TtfFormat {
-    const NAME: &'static str = "TTF/OTF";
+    fn name() -> &'static str { "TTF/OTF"}
     type Options = ();
 
     fn import(&self, bytes: Vec<u8>, _: ()) -> Result<FontData, Error> {
@@ -63,7 +63,7 @@ pub enum FontFormat {
 }
 
 impl SimpleFormat<FontAsset> for FontFormat {
-    const NAME: &'static str = "FontFormat";
+    fn name() -> &'static str { "FontFormat"}
     type Options = ();
 
     fn import(&self, bytes: Vec<u8>, _: ()) -> Result<FontData, Error> {

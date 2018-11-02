@@ -86,7 +86,7 @@ where
 }
 
 impl Asset for Mesh {
-    const NAME: &'static str = "renderer::Mesh";
+    fn name() -> &'static str { "renderer::Mesh" }
     type Data = MeshData;
     type HandleStorage = VecStorage<MeshHandle>;
 }
@@ -118,7 +118,7 @@ impl<'a> PrefabData<'a> for MeshData {
 pub struct ObjFormat;
 
 impl SimpleFormat<Mesh> for ObjFormat {
-    const NAME: &'static str = "WAVEFRONT_OBJ";
+    fn name() -> &'static str { "WAVEFRONT_OBJ"}
 
     type Options = ();
 

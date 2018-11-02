@@ -14,7 +14,7 @@ where
     T: Asset,
     T::Data: for<'a> Deserialize<'a> + Send + Sync + 'static,
 {
-    const NAME: &'static str = "Ron";
+    fn name() -> &'static str { "Ron" }
     type Options = ();
 
     fn import(&self, bytes: Vec<u8>, _: ()) -> Result<T::Data, Error> {
@@ -39,7 +39,7 @@ where
     T: Asset,
     T::Data: for<'a> Deserialize<'a> + Send + Sync + 'static,
 {
-    const NAME: &'static str = "Json";
+    fn name() -> &'static str { "Json" }
     type Options = ();
 
     fn import(&self, bytes: Vec<u8>, _: ()) -> Result<T::Data, Error> {

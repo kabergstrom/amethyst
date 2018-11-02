@@ -112,7 +112,7 @@ impl Loader {
         let name = name.into();
         let source = source.as_ref();
 
-        let format_name = F::NAME;
+        let format_name = F::name();
         let source_name = match source {
             "" => "[default source]",
             other => other,
@@ -122,7 +122,7 @@ impl Loader {
 
         debug!(
             "{:?}: Loading asset {:?} with format {:?} from source {:?} (handle id: {:?})",
-            A::NAME,
+            A::name(),
             name,
             format_name,
             source_name,
@@ -147,7 +147,7 @@ impl Loader {
             profile_scope!("load_asset_from_worker");
             let data = format
                 .import(name.clone(), source, options, hot_reload)
-                .chain_err(|| ErrorKind::Format(F::NAME));
+                .chain_err(|| ErrorKind::Format(F::name()));
             let tracker = Box::new(tracker) as Box<Tracker>;
 
             processed.push(Processed::NewAsset {

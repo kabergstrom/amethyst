@@ -180,7 +180,7 @@ impl<A: Asset> AssetStorage<A> {
                             Ok((ProcessingState::Loaded(x), r)) => {
                                 debug!(
                                         "{:?}: Asset {:?} (handle id: {:?}) has been loaded successfully",
-                                        A::NAME,
+                                        A::name(),
                                         name,
                                         handle,
                                     );
@@ -194,7 +194,7 @@ impl<A: Asset> AssetStorage<A> {
                                     );
                                     tracker.fail(
                                         handle.id(),
-                                        A::NAME,
+                                        A::name(),
                                         name,
                                         Error::from_kind(ErrorKind::UnusedHandle),
                                     );
@@ -207,7 +207,7 @@ impl<A: Asset> AssetStorage<A> {
                             Ok((ProcessingState::Loading(x), r)) => {
                                 debug!(
                                         "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
-                                        A::NAME,
+                                        A::name(),
                                         name,
                                         handle,
                                     );
@@ -222,12 +222,12 @@ impl<A: Asset> AssetStorage<A> {
                             Err(e) => {
                                 error!(
                                     "{:?}: Asset {:?} (handle id: {:?}) could not be loaded: {}",
-                                    A::NAME,
+                                    A::name(),
                                     name,
                                     handle,
                                     e,
                                 );
-                                tracker.fail(handle.id(), A::NAME, name, e);
+                                tracker.fail(handle.id(), A::name(), name, e);
 
                                 continue;
                             }
@@ -260,7 +260,7 @@ impl<A: Asset> AssetStorage<A> {
                             Ok((ProcessingState::Loading(x), r)) => {
                                 debug!(
                                     "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
-                                    A::NAME,
+                                    A::name(),
                                     name,
                                     handle,
                                 );
@@ -276,7 +276,7 @@ impl<A: Asset> AssetStorage<A> {
                                 error!(
                                     "{:?}: Failed to hot-reload asset {:?} (handle id: {:?}): {}\n\
                                      Falling back to old reload object.",
-                                    A::NAME,
+                                    A::name(),
                                     name,
                                     handle,
                                     e,
@@ -336,14 +336,14 @@ impl<A: Asset> AssetStorage<A> {
             });
         }
         if count != 0 {
-            debug!("{:?}: Freed {} handle ids", A::NAME, count,);
+            debug!("{:?}: Freed {} handle ids", A::name(), count,);
         }
 
         if strategy
             .map(|s| s.needs_reload(frame_number))
             .unwrap_or(false)
         {
-            trace!("{:?}: Testing for asset reloads..", A::NAME);
+            trace!("{:?}: Testing for asset reloads..", A::name());
             self.hot_reload(pool);
         }
     }
@@ -363,7 +363,7 @@ impl<A: Asset> AssetStorage<A> {
 
             debug!(
                 "{:?}: Asset {:?} (handle id: {:?}) needs a reload using format {:?}",
-                A::NAME,
+                A::name(),
                 name,
                 handle,
                 format,

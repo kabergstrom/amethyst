@@ -272,7 +272,7 @@ where
     }
 
     fn format(&self) -> &'static str {
-        F::NAME
+        F::name()
     }
 
     fn reload(self: Box<Self>) -> Result<FormatValue<A>> {

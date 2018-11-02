@@ -2,7 +2,7 @@ use amethyst_assets::*;
 
 use super::Source as Audio;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AudioData(pub Vec<u8>);
 
 /// Loads audio from wav files.
@@ -10,7 +10,7 @@ pub struct AudioData(pub Vec<u8>);
 pub struct WavFormat;
 
 impl SimpleFormat<Audio> for WavFormat {
-    const NAME: &'static str = "WAV";
+    fn name() -> &'static str { "WAV"}
 
     type Options = ();
 
@@ -24,7 +24,7 @@ impl SimpleFormat<Audio> for WavFormat {
 pub struct OggFormat;
 
 impl SimpleFormat<Audio> for OggFormat {
-    const NAME: &'static str = "OGG";
+    fn name() -> &'static str {"OGG"}
 
     type Options = ();
 
@@ -38,7 +38,7 @@ impl SimpleFormat<Audio> for OggFormat {
 pub struct FlacFormat;
 
 impl SimpleFormat<Audio> for FlacFormat {
-    const NAME: &'static str = "FLAC";
+    fn name() -> &'static str {"FLAC"}
 
     type Options = ();
 
@@ -52,7 +52,7 @@ impl SimpleFormat<Audio> for FlacFormat {
 pub struct Mp3Format;
 
 impl SimpleFormat<Audio> for Mp3Format {
-    const NAME: &'static str = "MP3";
+    fn name() -> &'static str { "MP3"}
 
     type Options = ();
 
@@ -74,7 +74,7 @@ pub enum AudioFormat {
 }
 
 impl SimpleFormat<Audio> for AudioFormat {
-    const NAME: &'static str = "AudioFormat";
+    fn name() -> &'static str { "AudioFormat"}
 
     type Options = ();
 

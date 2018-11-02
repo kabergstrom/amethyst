@@ -17,7 +17,7 @@ use amethyst_core::specs::prelude::VecStorage;
 pub struct LocaleFormat;
 
 impl SimpleFormat<Locale> for LocaleFormat {
-    const NAME: &'static str = "FTL";
+    fn name() -> &'static str { "FTL" }
 
     type Options = ();
 
@@ -48,7 +48,7 @@ pub struct Locale {
 }
 
 impl Asset for Locale {
-    const NAME: &'static str = "locale::Locale";
+    fn name() -> &'static str { "locale::Locale" }
     type Data = Locale;
     type HandleStorage = VecStorage<LocaleHandle>;
 }

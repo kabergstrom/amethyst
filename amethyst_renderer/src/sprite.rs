@@ -23,7 +23,7 @@ pub struct SpriteSheet {
 }
 
 impl Asset for SpriteSheet {
-    const NAME: &'static str = "renderer::SpriteSheet";
+    fn name() -> &'static str { "renderer::SpriteSheet"}
     type Data = Self;
     type HandleStorage = VecStorage<Handle<Self>>;
 }
@@ -294,7 +294,7 @@ struct SerializedSpriteSheet {
 pub struct SpriteSheetFormat;
 
 impl SimpleFormat<SpriteSheet> for SpriteSheetFormat {
-    const NAME: &'static str = "SPRITE_SHEET";
+    fn name() -> &'static str { "SPRITE_SHEET"}
 
     type Options = Handle<Texture>;
 

@@ -6,6 +6,7 @@ use gfx::{
     traits::Pod,
 };
 use image::{DynamicImage, ImageFormat, RgbaImage};
+use serde::{ser::SerializeStruct, de::Error};
 
 use amethyst_assets::{
     AssetStorage, Format, Handle, Loader, PrefabData, PrefabError, ProcessingState,
@@ -48,6 +49,11 @@ pub struct TextureMetadata {
     /// This is usually `Srgb` for color textures, normalmaps & similar mostly use `Unorm`
     /// (which represents a value between `0.0` and `1.0`).
     pub channel: ChannelType,
+}
+impl Default for TextureMetadata {
+    fn default() -> TextureMetadata {
+        TextureMetadata::srgb()
+    }
 }
 
 impl TextureMetadata {
@@ -135,7 +141,6 @@ impl TextureMetadata {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum TextureData {
     /// Image data
-    #[serde(skip)]
     Image(ImageData, TextureMetadata),
 
     /// Color
@@ -277,6 +282,30 @@ where
     }
 }
 
+impl serde::Serialize for ImageData {
+    fn serialize<S>(&self, serializer: S) -> ::std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("ImageData", 3)?;
+        state.serialize_field("height", &self.rgba.height())?;
+        state.serialize_field("width", &self.rgba.width())?;
+        let raw = unsafe {::std::slice::from_raw_parts(
+            self.rgba.as_ptr(),
+            (self.rgba.height() * self.rgba.width() * 4) as usize,
+        )};
+        state.serialize_field("data", raw)?; 
+        state.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for ImageData {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<ImageData, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+Err(D::Error::custom("err"))
+    }
+}
 /// ImageData provided by formats, can be interpreted as a texture.
 #[derive(Clone, Debug)]
 pub struct ImageData {
@@ -317,7 +346,9 @@ impl JpgFormat {
 }
 
 impl SimpleFormat<Texture> for JpgFormat {
-    const NAME: &'static str = "JPEG";
+    fn name() -> &'static str {
+        "JPEG"
+    }
 
     type Options = TextureMetadata;
 
@@ -338,7 +369,9 @@ impl PngFormat {
 }
 
 impl SimpleFormat<Texture> for PngFormat {
-    const NAME: &'static str = "PNG";
+    fn name() -> &'static str {
+        "PNG"
+    }
 
     type Options = TextureMetadata;
 
@@ -352,7 +385,9 @@ impl SimpleFormat<Texture> for PngFormat {
 pub struct BmpFormat;
 
 impl SimpleFormat<Texture> for BmpFormat {
-    const NAME: &'static str = "BMP";
+    fn name() -> &'static str {
+        "BMP"
+    }
 
     type Options = TextureMetadata;
 
@@ -375,7 +410,9 @@ impl TgaFormat {
 }
 
 impl SimpleFormat<Texture> for TgaFormat {
-    const NAME: &'static str = "TGA";
+    fn name() -> &'static str {
+        "TGA"
+    }
 
     type Options = TextureMetadata;
 
@@ -510,7 +547,9 @@ pub enum TextureFormat {
 }
 
 impl SimpleFormat<Texture> for TextureFormat {
-    const NAME: &'static str = "TextureFormat";
+    fn name() -> &'static str {
+        "TextureFormat"
+    }
 
     type Options = TextureMetadata;
 

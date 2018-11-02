@@ -674,7 +674,7 @@ where
     F: Format<FontAsset, Options = ()> + Sync + DeserializeOwned + Clone,
     C: ToNativeWidget<A, I, F> + for<'de> serde::Deserialize<'de>,
 {
-    const NAME: &'static str = "Ui";
+    fn name() -> &'static str { "Ui"}
     type Options = ();
 
     fn import(&self, bytes: Vec<u8>, _: ()) -> AssetResult<UiPrefab<A, I, F, C::PrefabData>> {
