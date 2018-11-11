@@ -7,6 +7,7 @@ use gfx::{
 };
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use serde::{ser::SerializeStruct, de::Error};
+use serde_dyn::TypeUuid;
 
 use amethyst_assets::{
     AssetStorage, Format, Handle, Loader, PrefabData, PrefabError, ProcessingState,
@@ -598,4 +599,10 @@ mod tests {
             _ => panic!("Expected [f32; 3] to turn into TextureData::Rgba"),
         }
     }
+}
+
+
+uuid!{
+    TextureData => 30140358656523755833540163283161500253,
+    TextureMetadata => 212812966965103194810412242816171319956
 }

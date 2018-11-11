@@ -58,6 +58,8 @@ extern crate shred_derive;
 extern crate smallvec;
 extern crate wavefront_obj;
 extern crate winit;
+#[macro_use]
+extern crate serde_dyn;
 
 #[macro_use]
 #[cfg(feature = "profiler")]

@@ -1,9 +1,13 @@
+use serde_dyn::TypeUuid;
 use amethyst_assets::*;
 
 use super::Source as Audio;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct AudioData(pub Vec<u8>);
+uuid!{
+    AudioData => 152363896001301345872018713952728977845
+}
 
 /// Loads audio from wav files.
 #[derive(Clone)]

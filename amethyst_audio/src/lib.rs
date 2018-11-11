@@ -10,6 +10,8 @@ extern crate log;
 extern crate rodio;
 #[macro_use]
 extern crate serde;
+#[macro_use]
+extern crate serde_dyn;
 extern crate smallvec;
 
 #[macro_use]

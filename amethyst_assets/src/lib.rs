@@ -30,6 +30,13 @@ extern crate serde_json;
 extern crate shred;
 #[macro_use]
 extern crate shred_derive;
+#[macro_use]
+extern crate serde_dyn;
+#[macro_use]
+extern crate erased_serde;
+#[macro_use]
+extern crate downcast;
+extern crate uuid;
 
 #[macro_use]
 #[cfg(feature = "profiler")]
@@ -38,7 +45,7 @@ extern crate thread_profiler;
 #[cfg(feature = "json")]
 pub use formats::JsonFormat;
 pub use {
-    asset::{Asset, Format, FormatValue, SimpleFormat},
+    asset::{Asset, Format, FormatValue, SimpleFormat, SerdeObj, Importer, ImporterValue, SimpleImporterState, SimpleImporter, AssetUUID},
     cache::Cache,
     error::{Error, ErrorKind, Result, ResultExt},
     formats::RonFormat,

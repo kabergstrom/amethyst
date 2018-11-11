@@ -10,6 +10,7 @@ use amethyst_core::{
 };
 
 use {
+    serde_dyn::TypeUuid,
     mesh::{Mesh, MeshBuilder, MeshHandle},
     vertex::*,
     wavefront_obj::obj::{
@@ -291,4 +292,8 @@ impl From<VertexBufferCombination> for ComboMeshCreator {
     fn from(combo: VertexBufferCombination) -> Self {
         Self::new(combo)
     }
+}
+
+uuid!{
+    MeshData => 152363896001301345872018713952728977845
 }
