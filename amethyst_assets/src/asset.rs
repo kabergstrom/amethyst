@@ -66,10 +66,10 @@ pub trait Importer: Send + 'static {
 /// 16 byte v4 UUID for uniquely identifying imported assets
 pub type AssetUUID = [u8; 16];
 /// A trait for serializing any struct with a TypeUuid
-pub trait SerdeObj: Any + Serialize + TypeUuid {}
+pub trait SerdeObj: Any + Serialize + TypeUuid + Send {}
 serialize_trait_object!(SerdeObj);
 downcast!(SerdeObj);
-impl<T: Serialize + TypeUuid + 'static> SerdeObj for T {}
+impl<T: Serialize + TypeUuid + Send + 'static> SerdeObj for T {}
 
 /// Contains metadata and asset data for an imported asset
 pub struct ImportedAsset {
