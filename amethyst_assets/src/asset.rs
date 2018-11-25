@@ -207,11 +207,7 @@ impl<A: Asset> FormatValue<A> {
 /// contained in one file.
 pub trait SimpleFormat<A: Asset> {
     /// A unique identifier for this format.
-<<<<<<< HEAD
     fn name() -> &'static str where Self:Sized { "NONE" } 
-=======
-    fn name() -> &'static str { "NONE" }
->>>>>>> Changed Format to work as a trait object
     /// Options specific to the format, which are passed to `import`.
     /// E.g. for textures this would be stuff like mipmap levels and
     /// sampler info.
