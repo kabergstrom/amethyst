@@ -2,7 +2,7 @@ use fnv::FnvHashMap as HashMap;
 use gfx::memory::Pod;
 use winit::{dpi::LogicalSize, EventsLoop, Window as WinitWindow, WindowBuilder};
 
-use {
+use crate::{
     config::DisplayConfig,
     error::{Error, Result},
     mesh::{Mesh, MeshBuilder, VertexDataSet},
@@ -182,16 +182,18 @@ impl RendererBuilder {
             wb = wb.with_fullscreen(Some(self.events.get_primary_monitor()));
         }
 
+        let hidpi = self.events.get_primary_monitor().get_hidpi_factor();
+
         if let Some(dimensions) = self.config.dimensions {
-            wb = wb.with_dimensions(dimensions.into());
+            wb = wb.with_dimensions(LogicalSize::from_physical(dimensions, hidpi));
         }
 
         if let Some(dimensions) = self.config.min_dimensions {
-            wb = wb.with_min_dimensions(dimensions.into());
+            wb = wb.with_min_dimensions(LogicalSize::from_physical(dimensions, hidpi));
         }
 
         if let Some(dimensions) = self.config.max_dimensions {
-            wb = wb.with_max_dimensions(dimensions.into());
+            wb = wb.with_max_dimensions(LogicalSize::from_physical(dimensions, hidpi));
         }
 
         self.winit_builder = wb;
@@ -205,9 +207,9 @@ impl RendererBuilder {
     }
 
     /// Consumes the builder and creates the new `Renderer`.
-    pub fn build(mut self) -> Result<Renderer> {
+    pub fn build(self) -> Result<Renderer> {
         let Backend(device, mut factory, main_target, window) =
-            init_backend(self.winit_builder.clone(), &mut self.events, &self.config)?;
+            init_backend(self.winit_builder.clone(), &self.events, &self.config)?;
 
         let cached_size = window
             .get_inner_size()
@@ -235,7 +237,7 @@ struct Backend(pub Device, pub Factory, pub Target, pub Window);
 
 /// Creates the Direct3D 11 backend.
 #[cfg(all(feature = "d3d11", target_os = "windows"))]
-fn init_backend(wb: WindowBuilder, el: &mut EventsLoop, config: &DisplayConfig) -> Result<Backend> {
+fn init_backend(wb: WindowBuilder, el: &EventsLoop, config: &DisplayConfig) -> Result<Backend> {
     use gfx_window_dxgi as win;
 
     // FIXME: vsync + multisampling from config
@@ -262,7 +264,7 @@ fn init_backend(wb: WindowBuilder, el: &mut EventsLoop, config: &DisplayConfig) 
 }
 
 #[cfg(all(feature = "metal", target_os = "macos"))]
-fn init_backend(wb: WindowBuilder, el: &mut EventsLoop, config: &DisplayConfig) -> Result<Backend> {
+fn init_backend(wb: WindowBuilder, el: &EventsLoop, config: &DisplayConfig) -> Result<Backend> {
     use gfx_window_metal as win;
 
     // FIXME: vsync + multisampling from config
@@ -288,8 +290,8 @@ fn init_backend(wb: WindowBuilder, el: &mut EventsLoop, config: &DisplayConfig) 
 }
 
 /// Creates the OpenGL backend.
-#[cfg(all(feature = "opengl", not(target_os = "macos")))]
-fn init_backend(wb: WindowBuilder, el: &mut EventsLoop, config: &DisplayConfig) -> Result<Backend> {
+#[cfg(feature = "opengl")]
+fn init_backend(wb: WindowBuilder, el: &EventsLoop, config: &DisplayConfig) -> Result<Backend> {
     use gfx_window_glutin as win;
     use glutin;
     #[cfg(target_os = "macos")]
@@ -316,45 +318,6 @@ fn init_backend(wb: WindowBuilder, el: &mut EventsLoop, config: &DisplayConfig) 
         },
         size,
     );
-
-    Ok(Backend(dev, fac, main_target, win))
-}
-
-/// Creates the OpenGL backend.
-#[cfg(all(feature = "opengl", target_os = "macos"))]
-fn init_backend(wb: WindowBuilder, el: &mut EventsLoop, config: &DisplayConfig) -> Result<Backend> {
-    use gfx_window_glutin as win;
-    use glutin::{self, GlProfile, GlRequest};
-
-    let ctx = glutin::ContextBuilder::new()
-        .with_multisampling(config.multisampling)
-        .with_vsync(config.vsync)
-        .with_gl_profile(GlProfile::Core)
-        .with_gl(GlRequest::Latest);
-
-    let (win, dev, fac, color, depth) = win::init::<ColorFormat, DepthFormat>(wb, ctx, el);
-    let size = win.get_inner_size().ok_or(Error::WindowDestroyed)?.into();
-    let main_target = Target::new(
-        ColorBuffer {
-            as_input: None,
-            as_output: color,
-        },
-        DepthBuffer {
-            as_input: None,
-            as_output: depth,
-        },
-        size,
-    );
-
-    // FIXME: Resolve #972 and remove this extra resize
-    // On Mac 10.14 we need to resize the window after creation
-    // this is related to this issue amethyst/amethyst#972
-    el.poll_events(|_| {});
-    let (width, height): (u32, u32) = win
-        .get_outer_size()
-        .expect("Window no longer exists")
-        .into();
-    win.resize((width, height).into());
 
     Ok(Backend(dev, fac, main_target, win))
 }

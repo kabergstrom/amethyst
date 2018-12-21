@@ -1,6 +1,6 @@
 //! Displays several lines with both methods.
 
-extern crate amethyst;
+use amethyst;
 
 use amethyst::{
     controls::{FlyControlBundle, FlyControlTag},
@@ -44,8 +44,8 @@ impl<'s> System<'s> for ExampleLinesSystem {
 }
 
 struct ExampleState;
-impl<'a, 'b> SimpleState<'a, 'b> for ExampleState {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for ExampleState {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         // Setup debug lines as a resource
         data.world
             .add_resource(DebugLines::new().with_capacity(100));
@@ -136,7 +136,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for ExampleState {
             .with(Camera::from(Projection::perspective(
                 1.33333,
                 std::f32::consts::FRAC_PI_2,
-            ))).with(local_transform)
+            )))
+            .with(local_transform)
             .build();
     }
 }
@@ -144,11 +145,11 @@ impl<'a, 'b> SimpleState<'a, 'b> for ExampleState {
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir();
+    let app_root = application_root_dir()?;
 
-    let display_config_path = format!("{}/examples/debug_lines/resources/display.ron", app_root);
-    let key_bindings_path = format!("{}/examples/debug_lines/resources/input.ron", app_root);
-    let resources = format!("{}/examples/assets/", app_root);
+    let display_config_path = app_root.join("examples/debug_lines/resources/display.ron");
+    let key_bindings_path = app_root.join("examples/debug_lines/resources/input.ron");
+    let resources = app_root.join("examples/assets/");
 
     let pipe = Pipeline::build().with_stage(
         Stage::with_backbuffer()
@@ -162,12 +163,14 @@ fn main() -> amethyst::Result<()> {
         Some(String::from("move_x")),
         Some(String::from("move_y")),
         Some(String::from("move_z")),
-    ).with_sensitivity(0.1, 0.1);
+    )
+    .with_sensitivity(0.1, 0.1);
 
     let game_data = GameDataBuilder::default()
         .with_bundle(
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path)?,
-        )?.with(ExampleLinesSystem, "example_lines_system", &[])
+        )?
+        .with(ExampleLinesSystem, "example_lines_system", &[])
         .with_bundle(fly_control_bundle)?
         .with_bundle(TransformBundle::new().with_dep(&["fly_movement"]))?
         .with_bundle(RenderBundle::new(pipe, Some(config)))?;

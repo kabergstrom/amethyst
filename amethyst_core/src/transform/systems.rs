@@ -6,7 +6,7 @@ use specs::prelude::{
     WriteStorage,
 };
 
-use transform::{GlobalTransform, HierarchyEvent, Parent, ParentHierarchy, Transform};
+use crate::transform::{GlobalTransform, HierarchyEvent, Parent, ParentHierarchy, Transform};
 
 /// Handles updating `GlobalTransform` components based on the `Transform`
 /// component and parents.
@@ -64,7 +64,8 @@ impl<'a> System<'a> for TransformSystem {
                 self.locals_events_id.as_mut().expect(
                     "`TransformSystem::setup` was not called before `TransformSystem::run`",
                 ),
-            ).for_each(|event| match event {
+            )
+            .for_each(|event| match event {
                 ComponentEvent::Inserted(id) | ComponentEvent::Modified(id) => {
                     self.local_modified.add(*id);
                 }
@@ -146,7 +147,7 @@ mod tests {
     use specs::prelude::{Builder, World};
     use specs_hierarchy::{Hierarchy, HierarchySystem};
 
-    use transform::{GlobalTransform, Parent, Transform, TransformSystem};
+    use crate::transform::{GlobalTransform, Parent, Transform, TransformSystem};
 
     // If this works, then all other tests should work.
     #[test]

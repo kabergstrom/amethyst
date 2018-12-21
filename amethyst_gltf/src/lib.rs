@@ -1,20 +1,18 @@
 //! A crate for loading GLTF format scenes into Amethyst
 
-#![warn(missing_docs)]
+#![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
-extern crate amethyst_animation as animation;
-extern crate amethyst_assets as assets;
-extern crate amethyst_core as core;
-extern crate amethyst_renderer as renderer;
-extern crate base64;
-extern crate fnv;
-extern crate gfx;
-extern crate gltf;
-extern crate hibitset;
-extern crate itertools;
+use amethyst_animation as animation;
+use amethyst_assets as assets;
+use amethyst_core as core;
+use amethyst_renderer as renderer;
+use base64;
+
+use gltf;
+
 #[macro_use]
 extern crate log;
-extern crate mikktspace;
+use mikktspace;
 #[macro_use]
 extern crate serde;
 
@@ -24,8 +22,8 @@ extern crate thread_profiler;
 
 use std::{collections::HashMap, ops::Range};
 
-pub use format::GltfSceneFormat;
-use {
+pub use crate::format::GltfSceneFormat;
+use crate::{
     animation::{AnimatablePrefab, SkinnablePrefab},
     assets::{Handle, Prefab, PrefabData, PrefabLoaderSystem, ProgressCounter},
     core::{
@@ -273,7 +271,7 @@ impl<'a> PrefabData<'a> for GltfPrefab {
         let mut ret = false;
         if let Some(ref mut mats) = self.materials {
             mat_set.materials.clear();
-            for (id, mut material) in mats.materials.iter_mut() {
+            for (id, material) in mats.materials.iter_mut() {
                 if material.load_sub_assets(progress, materials)? {
                     ret = true;
                 }

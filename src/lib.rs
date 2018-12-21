@@ -54,43 +54,39 @@
 //! ```
 
 #![doc(html_logo_url = "https://www.amethyst.rs/assets/amethyst.svg")]
-#![warn(missing_docs)]
-#![cfg_attr(feature = "cargo-clippy", allow(type_complexity))] // complex project
+#![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
 #[macro_use]
 #[cfg(feature = "profiler")]
 pub extern crate thread_profiler;
 
-pub extern crate amethyst_animation as animation;
-pub extern crate amethyst_assets as assets;
-pub extern crate amethyst_audio as audio;
-pub extern crate amethyst_config as config;
-pub extern crate amethyst_controls as controls;
-pub extern crate amethyst_core as core;
+pub use amethyst_animation as animation;
+pub use amethyst_assets as assets;
+pub use amethyst_audio as audio;
+pub use amethyst_config as config;
+pub use amethyst_controls as controls;
+pub use amethyst_core as core;
 #[macro_use]
 pub extern crate amethyst_derive as derive;
-pub extern crate amethyst_input as input;
-pub extern crate amethyst_locale as locale;
-pub extern crate amethyst_network as network;
-pub extern crate amethyst_renderer as renderer;
-pub extern crate amethyst_ui as ui;
-pub extern crate amethyst_utils as utils;
-pub extern crate winit;
+pub use amethyst_input as input;
+pub use amethyst_locale as locale;
+pub use amethyst_network as network;
+pub use amethyst_renderer as renderer;
+pub use amethyst_ui as ui;
+pub use amethyst_utils as utils;
+pub use winit;
 
-extern crate amethyst_ui;
-extern crate crossbeam_channel;
 #[macro_use]
 extern crate derivative;
-extern crate fern;
+use fern;
 #[macro_use]
 extern crate log;
-extern crate amethyst_input;
-extern crate rayon;
-extern crate rustc_version_runtime;
+
+use rustc_version_runtime;
 #[macro_use]
 extern crate serde_derive;
 
-pub use core::{shred, shrev, specs as ecs};
+pub use crate::core::{shred, shrev, specs as ecs};
 
 pub use self::{
     app::{Application, ApplicationBuilder, CoreApplication},
@@ -106,7 +102,7 @@ pub use self::{
 };
 
 #[doc(hidden)]
-pub use derive::*;
+pub use crate::derive::*;
 
 pub mod prelude;
 

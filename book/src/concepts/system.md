@@ -357,8 +357,8 @@ impl Default for Game {
 
 struct GameplayState;
 
-impl<'a, 'b> SimpleState<'a, 'b> for GameplayState {
-    fn update(&mut self, data: &mut StateData<GameData>) -> SimpleTrans<'a, 'b> {
+impl SimpleState for GameplayState {
+    fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
         // If the `Game` resource has been set up to go back to the menu, pop
         // the state so that we go back.
 
@@ -371,7 +371,7 @@ impl<'a, 'b> SimpleState<'a, 'b> for GameplayState {
         Trans::None
     }
 
-    fn on_resume(&mut self, mut data: StateData<GameData>) {
+    fn on_resume(&mut self, mut data: StateData<'_, GameData<'_, '_>>) {
         // mark that the current state is a gameplay state.
         data.world.write_resource::<Game>().current_state = CurrentState::Gameplay;
     }
@@ -379,8 +379,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for GameplayState {
 
 struct GameMenuState;
 
-impl<'a, 'b> SimpleState<'a, 'b> for GameMenuState {
-    fn update(&mut self, data: &mut StateData<GameData>) -> SimpleTrans<'a, 'b> {
+impl SimpleState for GameMenuState {
+    fn update(&mut self, data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
         let mut game = data.world.write_resource::<Game>();
 
         match game.user_action.take() {
@@ -393,7 +393,7 @@ impl<'a, 'b> SimpleState<'a, 'b> for GameMenuState {
         }
     }
 
-    fn on_resume(&mut self, mut data: StateData<GameData>) {
+    fn on_resume(&mut self, mut data: StateData<'_, GameData<'_, '_>>) {
         // mark that the current state is a main menu state.
         data.world.write_resource::<Game>().current_state = CurrentState::MainMenu;
     }

@@ -7,7 +7,7 @@ use amethyst_core::specs::prelude::{
     Component, DenseVecStorage, Entity, FlaggedStorage, WriteStorage,
 };
 
-use {
+use crate::{
     error::Result,
     formats::MeshCreator,
     mesh::{Mesh, MeshBuilder},
@@ -99,7 +99,7 @@ impl MeshCreator for AnimatedComboMeshCreator {
         &self.combo.0
     }
 
-    fn box_clone(&self) -> Box<MeshCreator> {
+    fn box_clone(&self) -> Box<dyn MeshCreator> {
         Box::new((*self).clone())
     }
 }
@@ -136,6 +136,7 @@ impl<'a> PrefabData<'a> for JointTransformsPrefab {
                     skin: entities[self.skin],
                     matrices: vec![[[0.; 4]; 4]; self.size],
                 },
-            ).map(|_| ())
+            )
+            .map(|_| ())
     }
 }

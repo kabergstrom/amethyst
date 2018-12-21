@@ -1,6 +1,6 @@
 //! TODO: Rewrite for new renderer.
 
-extern crate amethyst;
+use amethyst;
 #[macro_use]
 extern crate serde_derive;
 
@@ -10,6 +10,7 @@ mod config;
 mod pong;
 mod systems;
 
+use crate::{audio::Music, bundle::PongBundle, config::PongConfig};
 use amethyst::{
     audio::AudioBundle,
     core::{frame_limiter::FrameRateLimitStrategy, transform::TransformBundle},
@@ -20,9 +21,6 @@ use amethyst::{
     ui::UiBundle,
     utils::application_root_dir,
 };
-use audio::Music;
-use bundle::PongBundle;
-use config::PongConfig;
 use std::time::Duration;
 
 const AUDIO_MUSIC: &'static [&'static str] = &[
@@ -35,22 +33,23 @@ const AUDIO_SCORE: &'static str = "audio/score.ogg";
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    use pong::Pong;
+    use crate::pong::Pong;
 
-    let app_root = application_root_dir();
+    let app_root = application_root_dir()?;
 
-    let display_config_path = format!("{}/examples/appendix_a/resources/display.ron", app_root);
-    let key_bindings_path = format!("{}/examples/appendix_a/resources/input.ron", app_root);
+    let display_config_path = app_root.join("examples/appendix_a/resources/display.ron");
+    let key_bindings_path = app_root.join("examples/appendix_a/resources/input.ron");
 
-    let config = format!("{}/examples/appendix_a/resources/config.ron", app_root);
-    let assets_dir = format!("{}/examples/assets/", app_root);
+    let config = app_root.join("examples/appendix_a/resources/config.ron");
+    let assets_dir = app_root.join("examples/assets/");
 
     let pong_config = PongConfig::load(&config);
 
     let game_data = GameDataBuilder::default()
         .with_bundle(
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path)?,
-        )?.with_bundle(PongBundle::default())?
+        )?
+        .with_bundle(PongBundle::default())?
         .with_bundle(TransformBundle::new().with_dep(&["ball_system", "paddle_system"]))?
         .with_bundle(AudioBundle::new(|music: &mut Music| music.music.next()))?
         .with_bundle(UiBundle::<String, String>::new())?
@@ -60,7 +59,8 @@ fn main() -> amethyst::Result<()> {
         .with_frame_limit(
             FrameRateLimitStrategy::SleepAndYield(Duration::from_millis(2)),
             144,
-        ).with_resource(pong_config.arena)
+        )
+        .with_resource(pong_config.arena)
         .with_resource(pong_config.ball)
         .with_resource(pong_config.paddles)
         .build(game_data)?;

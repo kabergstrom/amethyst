@@ -13,7 +13,7 @@ use amethyst_core::specs::{
     prelude::{Entity, Read, ReadExpect, WriteStorage},
 };
 
-use {Animation, AnimationHierarchy, AnimationSampling, AnimationSet, RestState, Sampler};
+use crate::{Animation, AnimationHierarchy, AnimationSampling, AnimationSet, RestState, Sampler};
 
 /// `PrefabData` for loading a single `Animation`
 ///
@@ -61,7 +61,7 @@ where
 pub struct MissingAssetHandle;
 
 impl Display for MissingAssetHandle {
-    fn fmt(&self, f: &mut Formatter) -> FmtResult {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "{:?}", self)
     }
 }
@@ -71,7 +71,7 @@ impl Error for MissingAssetHandle {
         "AnimationPrefab was not populated with an asset handle prior to calling load_prefab."
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -116,7 +116,8 @@ where
                         channel.clone(),
                         loader.load_from_data(sampler.clone(), &mut *progress, sampler_storage),
                     )
-                }).collect(),
+                })
+                .collect(),
         };
         self.handle = Some(loader.load_from_data(animation, progress, animation_storage));
         Ok(true)
@@ -221,7 +222,8 @@ where
                         .map(|(node_index, entity_index)| (*node_index, entities[*entity_index]))
                         .collect(),
                 ),
-            ).map(|_| ())
+            )
+            .map(|_| ())
     }
 }
 

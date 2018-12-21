@@ -1,6 +1,6 @@
 //! Displays a shaded sphere to the user.
 
-extern crate amethyst;
+use amethyst;
 #[macro_use]
 extern crate serde;
 
@@ -46,11 +46,11 @@ impl Default for Example {
     }
 }
 
-impl<'a, 'b> SimpleState<'a, 'b> for Example {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for Example {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let StateData { world, .. } = data;
         // Initialise the scene with an object, a light and a camera.
-        let prefab_handle = world.exec(|loader: PrefabLoader<MyPrefabData>| {
+        let prefab_handle = world.exec(|loader: PrefabLoader<'_, MyPrefabData>| {
             loader.load("prefab/animation.ron", RonFormat, (), ())
         });
         self.sphere = Some(world.create_entity().with(prefab_handle).build());
@@ -58,9 +58,9 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
 
     fn handle_event(
         &mut self,
-        data: StateData<GameData>,
+        data: StateData<'_, GameData<'_, '_>>,
         event: StateEvent,
-    ) -> SimpleTrans<'a, 'b> {
+    ) -> SimpleTrans {
         let StateData { world, .. } = data;
         if let StateEvent::Window(event) = &event {
             if is_close_requested(&event) || is_key_down(&event, VirtualKeyCode::Escape) {
@@ -109,7 +109,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
                     get_animation_set::<AnimationId, Transform>(
                         &mut world.write_storage(),
                         self.sphere.unwrap().clone(),
-                    ).unwrap()
+                    )
+                    .unwrap()
                     .step(self.current_animation, StepDirection::Backward);
                 }
 
@@ -117,7 +118,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
                     get_animation_set::<AnimationId, Transform>(
                         &mut world.write_storage(),
                         self.sphere.unwrap().clone(),
-                    ).unwrap()
+                    )
+                    .unwrap()
                     .step(self.current_animation, StepDirection::Forward);
                 }
 
@@ -126,7 +128,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
                     get_animation_set::<AnimationId, Transform>(
                         &mut world.write_storage(),
                         self.sphere.unwrap().clone(),
-                    ).unwrap()
+                    )
+                    .unwrap()
                     .set_rate(self.current_animation, self.rate);
                 }
 
@@ -135,7 +138,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
                     get_animation_set::<AnimationId, Transform>(
                         &mut world.write_storage(),
                         self.sphere.unwrap().clone(),
-                    ).unwrap()
+                    )
+                    .unwrap()
                     .set_rate(self.current_animation, self.rate);
                 }
 
@@ -144,7 +148,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
                     get_animation_set::<AnimationId, Transform>(
                         &mut world.write_storage(),
                         self.sphere.unwrap().clone(),
-                    ).unwrap()
+                    )
+                    .unwrap()
                     .set_rate(self.current_animation, self.rate);
                 }
 
@@ -170,21 +175,17 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir();
-
-    let display_config_path = format!(
-        "{}/examples/animation/resources/display_config.ron",
-        app_root
-    );
-
-    let resources = format!("{}/examples/assets/", app_root);
+    let app_root = application_root_dir()?;
+    let display_config_path = app_root.join("examples/animation/resources/display_config.ron");
+    let resources = app_root.join("examples/assets/");
 
     let game_data = GameDataBuilder::default()
         .with(PrefabLoaderSystem::<MyPrefabData>::default(), "", &[])
         .with_bundle(AnimationBundle::<AnimationId, Transform>::new(
             "animation_control_system",
             "sampler_interpolation_system",
-        ))?.with_bundle(TransformBundle::new().with_dep(&["sampler_interpolation_system"]))?
+        ))?
+        .with_bundle(TransformBundle::new().with_dep(&["sampler_interpolation_system"]))?
         .with_basic_renderer(display_config_path, DrawShaded::<PosNormTex>::new(), false)?;
     let mut game = Application::new(resources, Example::default(), game_data)?;
     game.run();

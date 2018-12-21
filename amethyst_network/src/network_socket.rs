@@ -69,7 +69,7 @@ where
     E: PartialEq,
 {
     /// The list of filters applied on the events received.
-    pub filters: Vec<Box<NetFilter<E>>>,
+    pub filters: Vec<Box<dyn NetFilter<E>>>,
 
     tx: Sender<InternalSocketEvent<E>>,
     rx: Receiver<RawEvent>,
@@ -80,7 +80,7 @@ where
     E: Serialize + PartialEq + Send + 'static,
 {
     /// Creates a `NetSocketSystem` and binds the Socket on the ip and port added in parameters.
-    pub fn new(addr: SocketAddr, filters: Vec<Box<NetFilter<E>>>) -> Result<Self, Error> {
+    pub fn new(addr: SocketAddr, filters: Vec<Box<dyn NetFilter<E>>>) -> Result<Self, Error> {
         if addr.port() < 1024 {
             // Just warning the user here, just in case they want to use the root port.
             warn!("Using a port below 1024, this will require root permission and should not be done.");
@@ -89,9 +89,12 @@ where
         let mut socket = UdpSocket::bind(addr, NetworkConfig::default())
             .map_err(|x| Error::new(ErrorKind::Other, x.to_string()))?;
 
-        socket
-            .set_nonblocking(true)
-            .expect("Unable to set `UdpSocket` to non-blocking mode");
+        socket.set_nonblocking(true).map_err(|_| {
+            Error::new(
+                ErrorKind::Other,
+                "Unable to set `UdpSocket` to non-blocking mode",
+            )
+        })?;
 
         // this -> thread
         let (tx1, rx1) = channel();
@@ -164,7 +167,7 @@ where
     }
 
     fn run(&mut self, mut net_connections: Self::SystemData) {
-        for mut net_connection in (&mut net_connections).join() {
+        for net_connection in (&mut net_connections).join() {
             let target = net_connection.target;
 
             if net_connection.state == ConnectionState::Connected
@@ -174,7 +177,8 @@ where
                     .send(InternalSocketEvent::SendEvents {
                         target,
                         events: net_connection.send_buffer_early_read().cloned().collect(),
-                    }).expect("Unreachable: Channel will be alive until a stop event is sent");
+                    })
+                    .expect("Unreachable: Channel will be alive until a stop event is sent");
             } else if net_connection.state == ConnectionState::Disconnected {
                 self.tx
                     .send(InternalSocketEvent::Stop)
@@ -183,12 +187,10 @@ where
         }
 
         for raw_event in self.rx.try_iter() {
-            let mut matched = false;
             // Get the NetConnection from the source
-            for mut net_connection in (&mut net_connections).join() {
+            for net_connection in (&mut net_connections).join() {
                 // We found the origin
                 if net_connection.target == raw_event.source {
-                    matched = true;
                     // Get the event
                     let net_event = deserialize_event::<E>(raw_event.data.as_slice());
                     match net_event {
@@ -200,9 +202,8 @@ where
                             e, raw_event.source
                         ),
                     }
-                }
-                if !matched {
-                    println!("Received packet from unknown source");
+                } else {
+                    warn!("Received packet from unknown source");
                 }
             }
         }

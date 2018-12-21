@@ -15,7 +15,7 @@ use amethyst_assets::{
 };
 use amethyst_core::specs::prelude::{Entity, Read, ReadExpect};
 
-use {
+use crate::{
     tex::{FilterMethod, Texture, TextureBuilder},
     types::SurfaceFormat,
     Renderer,
@@ -300,7 +300,7 @@ impl serde::Serialize for ImageData {
     }
 }
 impl<'de> serde::Deserialize<'de> for ImageData {
-    fn deserialize<D>(deserializer: D) -> ::std::result::Result<ImageData, D::Error>
+    fn deserialize<D>(_deserializer: D) -> ::std::result::Result<ImageData, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
@@ -565,7 +565,7 @@ impl SimpleFormat<Texture> for TextureFormat {
 }
 
 mod serde_helper {
-    use tex::{FilterMethod, WrapMode};
+    use crate::tex::{FilterMethod, WrapMode};
 
     use super::SamplerInfo;
 

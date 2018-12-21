@@ -102,8 +102,8 @@ struct GameplayState {
     player_count: u8,
 }
 
-impl<'a,'b> SimpleState<'a,'b> for GameplayState {
-    fn on_start(&mut self, _data: StateData<GameData>) {
+impl SimpleState for GameplayState {
+    fn on_start(&mut self, _data: StateData<'_, GameData<'_, '_>>) {
         println!("Number of players: {}", self.player_count);
     }
 }
@@ -116,7 +116,7 @@ We first declare the `State`'s struct `GameplayState`.
 In this case, we give it some data: `player_count`, a byte.
 
 Then, we implement the `SimpleState` trait for our `GameplayState`.
-`SimpleState` is a shorthand for `State<GameData<'a, 'b>, ()>` where `GameData` is the internal shared data between states.
+`SimpleState` is a shorthand for `State<GameData<'static, 'static>, ()>` where `GameData` is the internal shared data between states.
 
 ### Switching State
 

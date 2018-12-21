@@ -2,7 +2,7 @@
 
 use fnv::FnvHashMap as HashMap;
 
-use {
+use crate::{
     error::Result,
     types::{DepthStencilView, Encoder, Factory, RenderTargetView, ShaderResourceView, Window},
 };
@@ -174,7 +174,8 @@ impl TargetBuilder {
                     as_input: Some(res),
                     as_output: rt,
                 })
-            }).collect::<Result<_>>()?;
+            })
+            .collect::<Result<_>>()?;
 
         let depth_buf = if self.has_depth_buf {
             let (w, h) = (size.0 as u16, size.1 as u16);

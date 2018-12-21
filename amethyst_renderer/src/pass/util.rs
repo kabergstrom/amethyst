@@ -9,7 +9,7 @@ use amethyst_core::{
     GlobalTransform,
 };
 
-use {
+use crate::{
     cam::{ActiveCamera, Camera},
     mesh::Mesh,
     mtl::{Material, MaterialDefaults, TextureOffset},
@@ -87,7 +87,7 @@ pub(crate) fn add_texture(effect: &mut Effect, texture: &Texture) {
     effect.data.samplers.push(texture.sampler().clone());
 }
 
-pub(crate) fn setup_textures(builder: &mut EffectBuilder, types: &[TextureType]) {
+pub(crate) fn setup_textures(builder: &mut EffectBuilder<'_>, types: &[TextureType]) {
     use self::TextureType::*;
     for ty in types {
         match *ty {
@@ -141,7 +141,7 @@ pub(crate) fn add_textures(
     set_texture_offsets(effect, encoder, material, types);
 }
 
-pub(crate) fn setup_texture_offsets(builder: &mut EffectBuilder, types: &[TextureType]) {
+pub(crate) fn setup_texture_offsets(builder: &mut EffectBuilder<'_>, types: &[TextureType]) {
     use self::TextureType::*;
     for ty in types {
         match *ty {
@@ -232,7 +232,7 @@ pub(crate) fn set_texture_offsets(
     }
 }
 
-pub(crate) fn setup_vertex_args(builder: &mut EffectBuilder) {
+pub(crate) fn setup_vertex_args(builder: &mut EffectBuilder<'_>) {
     builder.with_raw_constant_buffer(
         "VertexArgs",
         mem::size_of::<<VertexArgs as Uniform>::Std140>(),
@@ -262,7 +262,8 @@ pub fn set_vertex_args(
                 view: view.into(),
                 model: model.into(),
             }
-        }).unwrap_or_else(|| {
+        })
+        .unwrap_or_else(|| {
             let proj: [[f32; 4]; 4] = Matrix4::identity().into();
             let view: [[f32; 4]; 4] = Matrix4::identity().into();
             let model: [[f32; 4]; 4] = global.0.into();
@@ -293,7 +294,8 @@ pub fn set_view_args(
                 proj: proj.into(),
                 view: view.into(),
             }
-        }).unwrap_or_else(|| {
+        })
+        .unwrap_or_else(|| {
             let identity: [[f32; 4]; 4] = Matrix4::identity().into();
             ViewArgs {
                 proj: identity.clone().into(),
@@ -355,13 +357,14 @@ pub(crate) fn draw_mesh(
 /// Returns the main camera and its `GlobalTransform`
 pub fn get_camera<'a>(
     active: Option<Read<'a, ActiveCamera>>,
-    camera: &'a ReadStorage<Camera>,
-    global: &'a ReadStorage<GlobalTransform>,
+    camera: &'a ReadStorage<'a, Camera>,
+    global: &'a ReadStorage<'a, GlobalTransform>,
 ) -> Option<(&'a Camera, &'a GlobalTransform)> {
     active
         .and_then(|a| {
             let cam = camera.get(a.entity);
             let transform = global.get(a.entity);
             cam.into_iter().zip(transform.into_iter()).next()
-        }).or_else(|| (camera, global).join().next())
+        })
+        .or_else(|| (camera, global).join().next())
 }

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use {
+use crate::{
     core::{
         specs::prelude::{Dispatcher, DispatcherBuilder, System, World},
         ArcThreadPool, SystemBundle,
@@ -15,7 +15,10 @@ pub trait DataInit<T> {
     fn build(self, world: &mut World) -> T;
 }
 
-/// Default game data
+/// Default game data.
+///
+/// The lifetimes are for the systems inside and can be `'static` unless a system has a borrowed
+/// field.
 pub struct GameData<'a, 'b> {
     dispatcher: Dispatcher<'a, 'b>,
 }
@@ -234,7 +237,7 @@ impl<'a, 'b> GameDataBuilder<'a, 'b> {
         A: AsRef<Path>,
         P: Pass + 'b,
     {
-        use {
+        use crate::{
             config::Config,
             renderer::{DisplayConfig, Pipeline, RenderBundle, Stage},
             ui::DrawUi,
