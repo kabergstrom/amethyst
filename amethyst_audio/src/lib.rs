@@ -1,18 +1,14 @@
-#![warn(missing_docs)]
-#![cfg_attr(feature = "cargo-clippy", allow(type_complexity))] // complex project
+#![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
 //! Loading and playing of audio files.
-extern crate amethyst_assets;
-extern crate amethyst_core;
-extern crate cpal;
 #[macro_use]
 extern crate log;
-extern crate rodio;
+
 #[macro_use]
 extern crate serde;
+
 #[macro_use]
 extern crate serde_dyn;
-extern crate smallvec;
 
 #[macro_use]
 #[cfg(feature = "profiler")]
@@ -47,7 +43,7 @@ mod systems;
 pub struct DecoderError;
 
 impl Display for DecoderError {
-    fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> FmtResult {
         formatter.write_str("DecoderError")
     }
 }
@@ -57,7 +53,7 @@ impl Error for DecoderError {
         "An error occurred while decoding sound data."
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }

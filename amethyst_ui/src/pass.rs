@@ -6,6 +6,7 @@ use std::{
 };
 
 use fnv::FnvHashMap as HashMap;
+use fnv::FnvHashSet as HashSet;
 use gfx::preset::blend;
 use gfx::pso::buffer::ElemStride;
 use gfx::state::ColorMask;
@@ -116,7 +117,7 @@ impl<'a> PassData<'a> for DrawUi {
 }
 
 impl Pass for DrawUi {
-    fn compile(&mut self, mut effect: NewEffect) -> Result<Effect> {
+    fn compile(&mut self, mut effect: NewEffect<'_>) -> Result<Effect> {
         // Initialize a single unit quad, we'll use this mesh when drawing quads later.
         // Centered around (0,0) and of size 2
         let data = Shape::Plane(None).generate_vertices::<Vec<PosTex>>(None);
@@ -130,7 +131,8 @@ impl Pass for DrawUi {
                 "VertexArgs",
                 mem::size_of::<<VertexArgs as Uniform>::Std140>(),
                 1,
-            ).with_raw_vertex_buffer(PosTex::ATTRIBUTES, PosTex::size() as ElemStride, 0)
+            )
+            .with_raw_vertex_buffer(PosTex::ATTRIBUTES, PosTex::size() as ElemStride, 0)
             .with_texture("albedo")
             .with_blended_output("color", ColorMask::all(), blend::ALPHA, None)
             .build()
@@ -154,7 +156,7 @@ impl Pass for DrawUi {
             editing,
             hidden,
             hidden_prop,
-        ): <Self as PassData>::Data,
+        ): <Self as PassData<'_>>::Data,
     ) {
         // Populate and update the draw order cache.
         {
@@ -225,6 +227,14 @@ impl Pass for DrawUi {
         };
         effect.data.vertex_bufs.push(vbuf);
 
+        //Gather unused glyph brushes
+        //These that are currently in use will be removed from this set.
+        let mut unused_glyph_brushes = self
+            .glyph_brushes
+            .iter()
+            .map(|(id, _)| *id)
+            .collect::<HashSet<_>>();
+
         let highest_abs_z = (&ui_transform,)
             .join()
             .map(|t| t.0.global_z)
@@ -232,6 +242,10 @@ impl Pass for DrawUi {
         for &(_z, entity) in &self.cached_draw_order.cache {
             // Do not render hidden entities.
             if hidden.contains(entity) || hidden_prop.contains(entity) {
+                ui_text
+                    .get_mut(entity)
+                    .and_then(|ui_text| ui_text.brush_id)
+                    .map(|brush_id| unused_glyph_brushes.remove(&brush_id));
                 continue;
             }
             let ui_transform = ui_transform
@@ -263,14 +277,19 @@ impl Pass for DrawUi {
                         Some(font) => font,
                         None => continue,
                     };
+
                     self.glyph_brushes.insert(
                         self.next_brush_cache_id,
                         GlyphBrushBuilder::using_font(font.0.clone()).build(factory.clone()),
                     );
+
                     ui_text.brush_id = Some(self.next_brush_cache_id);
                     ui_text.cached_font = ui_text.font.clone();
                     self.next_brush_cache_id += 1;
+                } else if let Some(brush_id) = ui_text.brush_id {
+                    unused_glyph_brushes.remove(&brush_id);
                 }
+
                 // Build text sections.
                 let editing = editing.get(entity);
                 let password_string = if ui_text.password {
@@ -285,7 +304,7 @@ impl Pass for DrawUi {
                 };
                 let rendered_string = password_string.as_ref().unwrap_or(&ui_text.text);
                 let hidpi = screen_dimensions.hidpi_factor() as f32;
-                let size = ui_text.font_size * hidpi;
+                let size = ui_text.font_size;
                 let scale = Scale::uniform(size);
                 let text = editing
                     .and_then(|editing| {
@@ -310,7 +329,8 @@ impl Pass for DrawUi {
                             .map(|i| i.0)
                             .unwrap_or_else(|| rendered_string.len());
                         start_byte.map(|start_byte| (editing, (start_byte, end_byte)))
-                    }).map(|(editing, (start_byte, end_byte))| {
+                    })
+                    .map(|(editing, (start_byte, end_byte))| {
                         vec![
                             SectionText {
                                 text: &((rendered_string)[0..start_byte]),
@@ -331,7 +351,8 @@ impl Pass for DrawUi {
                                 font_id: FontId(0),
                             },
                         ]
-                    }).unwrap_or_else(|| {
+                    })
+                    .unwrap_or_else(|| {
                         vec![SectionText {
                             text: rendered_string,
                             scale: scale,
@@ -358,18 +379,13 @@ impl Pass for DrawUi {
                     // instead of the expected [0,1]
                     screen_position: (
                         (ui_transform.pixel_x
-                            + ui_transform.pixel_width * ui_text.align.norm_offset().0)
-                            * hidpi,
+                            + ui_transform.pixel_width * ui_text.align.norm_offset().0),
                         // invert y because gfx-glyph inverts it back
                         (screen_dimensions.height()
                             - ui_transform.pixel_y
-                            - ui_transform.pixel_height * ui_text.align.norm_offset().1)
-                            * hidpi,
+                            - ui_transform.pixel_height * ui_text.align.norm_offset().1),
                     ),
-                    bounds: (
-                        ui_transform.pixel_width * hidpi,
-                        ui_transform.pixel_height * hidpi,
-                    ),
+                    bounds: (ui_transform.pixel_width, ui_transform.pixel_height),
                     // Invert z because of gfx-glyph using z+ forward
                     z: ui_transform.global_z / highest_abs_z,
                     layout,
@@ -442,7 +458,7 @@ impl Pass for DrawUi {
                                 pos.x + width / 2.0,
                                 screen_dimensions.height() - pos.y + ascent / 2.0,
                             ]
-                                .into(),
+                            .into(),
                             dimension: [width, height].into(),
                         };
                         effect.update_constant_buffer("VertexArgs", &vertex_args.std140(), encoder);
@@ -474,7 +490,8 @@ impl Pass for DrawUi {
                                 ui_text.color,
                                 &loader,
                                 &tex_storage,
-                            )).map(|tex| (tex, ed))
+                            ))
+                            .map(|tex| (tex, ed))
                     }) {
                         let blink_on = editing.cursor_blink_timer < 0.5 / CURSOR_BLINK_RATE;
                         if editing.use_block_cursor || blink_on {
@@ -530,10 +547,10 @@ impl Pass for DrawUi {
                             pos.y =
                                 screen_dimensions.height() - ui_transform.pixel_y + ascent / 2.0;
 
-                            let mut x = pos.x / hidpi;
+                            let mut x = pos.x;
                             if let Some(glyph) = glyph {
                                 if at_end {
-                                    x += glyph.unpositioned().h_metrics().advance_width / hidpi;
+                                    x += glyph.unpositioned().h_metrics().advance_width;
                                 }
                             }
                             let mut y = pos.y;
@@ -557,6 +574,10 @@ impl Pass for DrawUi {
                     }
                 }
             }
+        }
+
+        for id in unused_glyph_brushes.drain() {
+            self.glyph_brushes.remove(&id);
         }
     }
 }
@@ -582,5 +603,6 @@ fn cached_color_texture(
             let meta = TextureMetadata::srgb();
             let texture_data = TextureData::Rgba(color, meta);
             loader.load_from_data(texture_data, (), storage)
-        }).clone()
+        })
+        .clone()
 }

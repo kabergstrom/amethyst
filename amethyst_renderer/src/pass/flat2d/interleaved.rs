@@ -11,7 +11,7 @@ use amethyst_core::{
     transform::GlobalTransform,
 };
 
-use {
+use crate::{
     cam::{ActiveCamera, Camera},
     error::Result,
     hidden::{Hidden, HiddenPropagate},
@@ -81,7 +81,7 @@ impl<'a> PassData<'a> for DrawFlat2D {
 }
 
 impl Pass for DrawFlat2D {
-    fn compile(&mut self, effect: NewEffect) -> Result<Effect> {
+    fn compile(&mut self, effect: NewEffect<'_>) -> Result<Effect> {
         use std::mem;
 
         let mut builder = effect.simple(VERT_SRC, FRAG_SRC);
@@ -91,7 +91,8 @@ impl Pass for DrawFlat2D {
                 "ViewArgs",
                 mem::size_of::<<ViewArgs as Uniform>::Std140>(),
                 1,
-            ).with_raw_vertex_buffer(Self::attributes(), SpriteInstance::size() as ElemStride, 1);
+            )
+            .with_raw_vertex_buffer(Self::attributes(), SpriteInstance::size() as ElemStride, 1);
         setup_textures(&mut builder, &TEXTURES);
         match self.transparency {
             Some((mask, blend, depth)) => builder.with_blended_output("color", mask, blend, depth),
@@ -426,14 +427,8 @@ impl TextureBatch {
                     //
                     // * libgdx: <https://gamedev.stackexchange.com/q/22553>
                     // * godot: <https://godotengine.org/qa/9784>
-                    let pos =
-                        transform
-                            * Vector4::new(
-                                -sprite_data.offsets[0],
-                                -sprite_data.offsets[1],
-                                0.0,
-                                1.0,
-                            );
+                    let pos = transform
+                        * Vector4::new(-sprite_data.offsets[0], -sprite_data.offsets[1], 0.0, 1.0);
 
                     (dir_x, dir_y, pos, uv_left, uv_right, uv_top, uv_bottom)
                 }

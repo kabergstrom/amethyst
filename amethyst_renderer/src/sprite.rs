@@ -6,7 +6,7 @@ use amethyst_assets::{
 };
 use amethyst_core::specs::prelude::{Component, DenseVecStorage, VecStorage};
 
-use Texture;
+use crate::Texture;
 
 /// An asset handle to sprite sheet metadata.
 pub type SpriteSheetHandle = Handle<SpriteSheet>;
@@ -36,7 +36,7 @@ impl From<SpriteSheet> for AssetsResult<ProcessingState<SpriteSheet>> {
 
 /// Information about whether or not a texture should be flipped
 /// when rendering.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Flipped {
     /// Don't flip the texture
     None,
@@ -107,7 +107,7 @@ impl Sprite {
         sprite_h: u32,
         pixel_left: u32,
         pixel_top: u32,
-        offsets: [i32; 2],
+        offsets: [f32; 2],
     ) -> Sprite {
         let image_w = image_w as f32;
         let image_h = image_h as f32;
@@ -121,12 +121,15 @@ impl Sprite {
         // Texture coordinates are expressed as fractions of the position on the image.
         // Y axis texture coordinates start at the bottom of the image, so we have to invert them.
         //
-        // The 0.5 offsets is to get pixel perfection. See
+        // For pixel perfect result, the sprite border must be rendered exactly at
+        // screen pixel border or use nearest-neighbor sampling.
         // <http://www.mindcontrol.org/~hplus/graphics/opengl-pixel-perfect.html>
-        let left = (pixel_left + 0.5) / image_w;
-        let right = (pixel_right - 0.5) / image_w;
-        let top = (image_h - (pixel_top + 0.5)) / image_h;
-        let bottom = (image_h - (pixel_bottom - 0.5)) / image_h;
+        // NOTE: Maybe we should provide an option to round coordinates from `Transform`
+        // to nearest integer in `DrawFlat2D` pass before rendering.
+        let left = (pixel_left) / image_w;
+        let right = (pixel_right) / image_w;
+        let top = (image_h - pixel_top) / image_h;
+        let bottom = (image_h - pixel_bottom) / image_h;
 
         let tex_coords = TextureCoordinates {
             left,
@@ -204,13 +207,13 @@ impl Component for SpriteRender {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct SpritePosition {
     /// Horizontal position of the sprite in the sprite sheet
-    pub x: f32,
+    pub x: u32,
     /// Vertical position of the sprite in the sprite sheet
-    pub y: f32,
+    pub y: u32,
     /// Width of the sprite
-    pub width: f32,
+    pub width: u32,
     /// Height of the sprite
-    pub height: f32,
+    pub height: u32,
     /// Number of pixels to shift the sprite to the left and down relative to the entity holding it
     pub offsets: Option<[f32; 2]>,
 }
@@ -219,9 +222,9 @@ struct SpritePosition {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct SerializedSpriteSheet {
     /// Width of the sprite sheet
-    pub spritesheet_width: f32,
+    pub spritesheet_width: u32,
     /// Height of the sprite sheet
-    pub spritesheet_height: f32,
+    pub spritesheet_height: u32,
     /// Description of the sprites
     pub sprites: Vec<SpritePosition>,
 }
@@ -306,17 +309,16 @@ impl SimpleFormat<SpriteSheet> for SpriteSheetFormat {
         })?;
         let mut sprites: Vec<Sprite> = Vec::with_capacity(sheet.sprites.len());
         for sp in sheet.sprites {
-            sprites.push(Sprite {
-                width: sp.width,
-                height: sp.height,
-                offsets: sp.offsets.unwrap_or([0.0, 0.0]),
-                tex_coords: TextureCoordinates {
-                    left: sp.x / sheet.spritesheet_width,
-                    right: (sp.x + sp.width) / sheet.spritesheet_width,
-                    top: 1.0 - sp.y / sheet.spritesheet_height,
-                    bottom: 1.0 - (sp.y + sp.height) / sheet.spritesheet_height,
-                },
-            });
+            let sprite = Sprite::from_pixel_values(
+                sheet.spritesheet_width as u32,
+                sheet.spritesheet_height as u32,
+                sp.width as u32,
+                sp.height as u32,
+                sp.x as u32,
+                sp.y as u32,
+                sp.offsets.unwrap_or([0.0; 2]),
+            );
+            sprites.push(sprite);
         }
         Ok(SpriteSheet { texture, sprites })
     }
@@ -396,13 +398,13 @@ mod test {
         let sprite_h = 20;
         let pixel_left = 0;
         let pixel_top = 20;
-        let offsets = [-5, -10]; // Support negative offsets
+        let offsets = [-5.0, -10.0];
 
         assert_eq!(
             Sprite::from((
-                (10., 20.),                                    // Sprite w and h
-                [-5., -10.],                                   // Offsets
-                [0.5 / 30., 9.5 / 30., 0.5 / 40., 19.5 / 40.], // Texture coordinates
+                (10., 20.),                     // Sprite w and h
+                [-5., -10.],                    // Offsets
+                [0., 10. / 30., 0., 20. / 40.], // Texture coordinates
             )),
             Sprite::from_pixel_values(
                 image_w, image_h, sprite_w, sprite_h, pixel_left, pixel_top, offsets

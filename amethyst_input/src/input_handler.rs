@@ -62,8 +62,13 @@ where
     /// Updates the input handler with a new engine event.
     ///
     /// The Amethyst game engine will automatically call this if the InputHandler is attached to
-    /// the world as a resource with id 0.
-    pub fn send_event(&mut self, event: &Event, event_handler: &mut EventChannel<InputEvent<AC>>) {
+    /// the world as a resource.
+    pub fn send_event(
+        &mut self,
+        event: &Event,
+        event_handler: &mut EventChannel<InputEvent<AC>>,
+        hidpi: f64,
+    ) {
         match *event {
             Event::WindowEvent { ref event, .. } => match *event {
                 WindowEvent::ReceivedCharacter(c) => {
@@ -87,8 +92,8 @@ where
                                 ButtonPressed(Button::Key(key_code)),
                                 ButtonPressed(Button::ScanCode(scancode)),
                             ]
-                                .iter()
-                                .cloned(),
+                            .iter()
+                            .cloned(),
                         );
                         for (action, combinations) in self.bindings.actions.iter() {
                             for combination in combinations.iter().filter(|c| {
@@ -124,22 +129,24 @@ where
                                 ButtonReleased(Button::Key(key_code)),
                                 ButtonReleased(Button::ScanCode(scancode)),
                             ]
-                                .iter()
-                                .cloned(),
+                            .iter()
+                            .cloned(),
                         );
                         for (action, combinations) in self.bindings.actions.iter() {
                             for combination in combinations {
-                                if combination.contains(&Button::Key(key_code)) && combination
-                                    .iter()
-                                    .filter(|b| b != &&Button::Key(key_code))
-                                    .all(|b| self.button_is_down(*b))
+                                if combination.contains(&Button::Key(key_code))
+                                    && combination
+                                        .iter()
+                                        .filter(|b| b != &&Button::Key(key_code))
+                                        .all(|b| self.button_is_down(*b))
                                 {
                                     event_handler.single_write(ActionReleased(action.clone()));
                                 }
-                                if combination.contains(&Button::ScanCode(scancode)) && combination
-                                    .iter()
-                                    .filter(|b| b != &&Button::ScanCode(scancode))
-                                    .all(|b| self.button_is_down(*b))
+                                if combination.contains(&Button::ScanCode(scancode))
+                                    && combination
+                                        .iter()
+                                        .filter(|b| b != &&Button::ScanCode(scancode))
+                                        .all(|b| self.button_is_down(*b))
                                 {
                                     event_handler.single_write(ActionReleased(action.clone()));
                                 }
@@ -164,8 +171,8 @@ where
                                 MouseButtonPressed(mouse_button),
                                 ButtonPressed(Button::Mouse(mouse_button)),
                             ]
-                                .iter()
-                                .cloned(),
+                            .iter()
+                            .cloned(),
                         );
                         for (action, combinations) in self.bindings.actions.iter() {
                             for combination in combinations
@@ -199,15 +206,16 @@ where
                                 MouseButtonReleased(mouse_button),
                                 ButtonReleased(Button::Mouse(mouse_button)),
                             ]
-                                .iter()
-                                .cloned(),
+                            .iter()
+                            .cloned(),
                         );
                         for (action, combinations) in self.bindings.actions.iter() {
                             for combination in combinations {
-                                if combination.contains(&Button::Mouse(mouse_button)) && combination
-                                    .iter()
-                                    .filter(|b| b != &&Button::Mouse(mouse_button))
-                                    .all(|b| self.button_is_down(*b))
+                                if combination.contains(&Button::Mouse(mouse_button))
+                                    && combination
+                                        .iter()
+                                        .filter(|b| b != &&Button::Mouse(mouse_button))
+                                        .all(|b| self.button_is_down(*b))
                                 {
                                     event_handler.single_write(ActionReleased(action.clone()));
                                 }
@@ -221,11 +229,11 @@ where
                 } => {
                     if let Some((old_x, old_y)) = self.mouse_position {
                         event_handler.single_write(CursorMoved {
-                            delta_x: x - old_x,
-                            delta_y: y - old_y,
+                            delta_x: x * hidpi - old_x,
+                            delta_y: y * hidpi - old_y,
                         });
                     }
-                    self.mouse_position = Some((x, y));
+                    self.mouse_position = Some((x * hidpi, y * hidpi));
                 }
                 WindowEvent::Focused(false) => {
                     self.pressed_keys.clear();
@@ -295,8 +303,8 @@ where
                                 event.into(),
                                 ButtonPressed(Button::Controller(controller_id, button)),
                             ]
-                                .iter()
-                                .cloned(),
+                            .iter()
+                            .cloned(),
                         );
                         for (action, combinations) in self.bindings.actions.iter() {
                             for combination in combinations
@@ -327,8 +335,8 @@ where
                                 event.into(),
                                 ButtonReleased(Button::Controller(controller_id, button)),
                             ]
-                                .iter()
-                                .cloned(),
+                            .iter()
+                            .cloned(),
                         );
                         for (action, combinations) in self.bindings.actions.iter() {
                             for combination in combinations {
@@ -337,7 +345,8 @@ where
                                         .iter()
                                         .filter(|b| {
                                             b != &&Button::Controller(controller_id, button)
-                                        }).all(|b| self.button_is_down(*b))
+                                        })
+                                        .all(|b| self.button_is_down(*b))
                                 {
                                     event_handler.single_write(ActionReleased(action.clone()));
                                 }
@@ -509,7 +518,8 @@ where
                     } else {
                         0.0
                     }
-                }).unwrap_or(0.0),
+                })
+                .unwrap_or(0.0),
         })
     }
 
@@ -592,19 +602,21 @@ where
         for (action, combinations) in self.bindings.actions.iter() {
             for ref combination in combinations {
                 if let Some(dir) = dir_x {
-                    if combination.contains(&Button::MouseWheel(dir)) && combination
-                        .iter()
-                        .filter(|b| **b != Button::MouseWheel(dir))
-                        .all(|b| self.button_is_down(*b))
+                    if combination.contains(&Button::MouseWheel(dir))
+                        && combination
+                            .iter()
+                            .filter(|b| **b != Button::MouseWheel(dir))
+                            .all(|b| self.button_is_down(*b))
                     {
                         events.push(ActionWheelMoved(action.clone()));
                     }
                 }
                 if let Some(dir) = dir_y {
-                    if combination.contains(&Button::MouseWheel(dir)) && combination
-                        .iter()
-                        .filter(|b| **b != Button::MouseWheel(dir))
-                        .all(|b| self.button_is_down(*b))
+                    if combination.contains(&Button::MouseWheel(dir))
+                        && combination
+                            .iter()
+                            .filter(|b| **b != Button::MouseWheel(dir))
+                            .all(|b| self.button_is_down(*b))
                     {
                         events.push(ActionWheelMoved(action.clone()));
                     }

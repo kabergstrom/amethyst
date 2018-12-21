@@ -27,8 +27,8 @@ where
 #[derive(Debug)]
 struct ExampleState;
 
-impl<'a, 'b> SimpleState<'a, 'b> for ExampleState {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for ExampleState {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let texture_handle = load_texture("texture/sprite_sheet.png", &data.world);
     }
 }

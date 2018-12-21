@@ -1,6 +1,6 @@
 //! Displays a shaded sphere to the user.
 
-extern crate amethyst;
+use amethyst;
 #[macro_use]
 extern crate log;
 
@@ -28,21 +28,25 @@ struct Example {
     fps_display: Option<Entity>,
 }
 
-impl<'a, 'b> SimpleState<'a, 'b> for Example {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for Example {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let StateData { world, .. } = data;
         // Initialise the scene with an object, a light and a camera.
-        let handle = world.exec(|loader: PrefabLoader<MyPrefabData>| {
+        let handle = world.exec(|loader: PrefabLoader<'_, MyPrefabData>| {
             loader.load("prefab/sphere.ron", RonFormat, (), ())
         });
         world.create_entity().with(handle).build();
         init_output(&mut world.res);
-        world.exec(|mut creator: UiCreator| {
+        world.exec(|mut creator: UiCreator<'_>| {
             creator.create("ui/example.ron", ());
         });
     }
 
-    fn handle_event(&mut self, _: StateData<GameData>, event: StateEvent) -> SimpleTrans<'a, 'b> {
+    fn handle_event(
+        &mut self,
+        _: StateData<'_, GameData<'_, '_>>,
+        event: StateEvent,
+    ) -> SimpleTrans {
         match &event {
             StateEvent::Window(event) => {
                 if is_close_requested(&event) || is_key_down(&event, VirtualKeyCode::Escape) {
@@ -61,11 +65,10 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
         }
     }
 
-    fn update(&mut self, state_data: &mut StateData<GameData>) -> SimpleTrans<'a, 'b> {
-        let StateData { world, data } = state_data;
-        data.update(&world);
+    fn update(&mut self, state_data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
+        let StateData { world, .. } = state_data;
         if self.fps_display.is_none() {
-            world.exec(|finder: UiFinder| {
+            world.exec(|finder: UiFinder<'_>| {
                 if let Some(entity) = finder.find("fps") {
                     self.fps_display = Some(entity);
                 }
@@ -86,11 +89,10 @@ impl<'a, 'b> SimpleState<'a, 'b> for Example {
 fn main() -> amethyst::Result<()> {
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir();
+    let app_root = application_root_dir()?;
 
-    let display_config_path = format!("{}/examples/ui/resources/display.ron", app_root);
-
-    let resources = format!("{}/examples/assets", app_root);
+    let display_config_path = app_root.join("examples/ui/resources/display.ron");
+    let resources = app_root.join("examples/assets");
 
     let game_data = GameDataBuilder::default()
         .with(PrefabLoaderSystem::<MyPrefabData>::default(), "", &[])

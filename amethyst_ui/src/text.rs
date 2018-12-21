@@ -186,7 +186,7 @@ impl<'a> System<'a> for UiKeyboardSystem {
     fn run(
         &mut self,
         (entities, mut text, mut editable, transform, mut focused, events, time, screen_dimensions): Self::SystemData,
-){
+    ) {
         // Populate and update the tab order cache.
         {
             let bitset = &mut self.tab_order_cache.cached;
@@ -318,7 +318,7 @@ impl<'a> System<'a> for UiKeyboardSystem {
                     let hidpi = screen_dimensions.hidpi_factor() as f32;
                     self.mouse_position = (
                         position.x as f32 * hidpi,
-                        (screen_dimensions.height() - position.y as f32) * hidpi,
+                        (screen_dimensions.height() - position.y as f32 * hidpi),
                     );
                     if self.left_mouse_button_pressed {
                         let mut focused_text_edit = focused.entity.and_then(|entity| {
@@ -363,7 +363,8 @@ impl<'a> System<'a> for UiKeyboardSystem {
                                         && t.pixel_x + t.width / 2.0 >= self.mouse_position.0
                                         && t.pixel_y - t.height / 2.0 <= self.mouse_position.1
                                         && t.pixel_y + t.height / 2.0 >= self.mouse_position.1
-                                }).map(|(e, t)| (e, t.global_z))
+                                })
+                                .map(|(e, t)| (e, t.global_z))
                                 // In instances of ambiguity we want to select the element with the
                                 // highest Z order, so we need to find the highest Z order value among
                                 // eligible elements.
@@ -613,9 +614,8 @@ impl<'a> System<'a> for UiKeyboardSystem {
                                 {
                                     Ok(contents) => {
                                         let index = cursor_byte_index(focused_edit, focused_text);
-                                        let empty_space =
-                                            focused_edit.max_length
-                                                - focused_text.text.graphemes(true).count();
+                                        let empty_space = focused_edit.max_length
+                                            - focused_text.text.graphemes(true).count();
                                         let contents = contents
                                             .graphemes(true)
                                             .take(empty_space)
@@ -684,12 +684,13 @@ where
 {
     i.enumerate()
         .min_by(|(_, g1), (_, g2)| {
-            let dist = |g: &PositionedGlyph| {
+            let dist = |g: &PositionedGlyph<'_>| {
                 let Point { x, y } = g.position();
                 ((x - mouse_x).powi(2) + (y - mouse_y).powi(2)).sqrt()
             };
             dist(g1).partial_cmp(&dist(g2)).expect("Unexpected NaN!")
-        }).map(|(i, _)| i)
+        })
+        .map(|(i, _)| i)
         .unwrap_or(0) as isize
 }
 

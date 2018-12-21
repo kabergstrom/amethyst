@@ -10,6 +10,28 @@ use super::{Axis, Button};
 /// Used for saving and loading input settings.
 ///
 /// An action can either be a single button or a combination of them.
+///
+/// # Examples
+///
+/// Example Ron config file:
+/// ```ron
+/// (
+///     axes: {
+///         "updown": Emulated(
+///             pos: Key(Up),
+///             neg: Key(Down)
+///         ),
+///         "leftright": Emulated(
+///             pos: Key(Right),
+///             neg: Key(Left)
+///         )
+///     },
+///     actions: {
+///         "fire": [ [Mouse(Left)], [Key(X)] ], // Multiple bindings for one action
+///         "reload": [ [Key(LControl), Key(R)] ] // Combinations of multiple bindings possible
+///     }
+/// )
+/// ```
 #[derive(Derivative, Serialize, Deserialize, Clone)]
 #[derivative(Default(bound = ""))]
 pub struct Bindings<AX, AC>
@@ -18,6 +40,10 @@ where
     AC: Hash + Eq,
 {
     pub(super) axes: HashMap<AX, Axis>,
+    /// The inner array here is for button combinations, the other is for different possibilities.
+    ///
+    /// So for example if you want to quit by either "Esc" or "Ctrl+q" you would have
+    /// `[[Esc], [Ctrl, Q]]`.
     pub(super) actions: HashMap<AC, SmallVec<[SmallVec<[Button; 2]>; 4]>>,
 }
 
@@ -95,16 +121,18 @@ where
     }
 
     /// Removes an action binding that was assigned previously.
-    pub fn remove_action_binding<T: Hash + Eq + ?Sized>(
-        &mut self,
-        id: &T,
-        binding: SmallVec<[Button; 2]>,
-    ) where
+    pub fn remove_action_binding<T: Hash + Eq + ?Sized>(&mut self, id: &T, binding: &[Button])
+    where
         AC: Borrow<T>,
     {
         let mut kill_it = false;
         if let Some(action_bindings) = self.actions.get_mut(id) {
-            let index = action_bindings.iter().position(|b| b == &binding);
+            let index = action_bindings.iter().position(|b| {
+                b.len() == binding.len()
+                    // The bindings can be provided in any order, but they must all
+                    // be the same bindings.
+                    && b.iter().all(|b| binding.iter().any(|binding| b == binding))
+            });
             if let Some(index) = index {
                 action_bindings.swap_remove(index);
             }
@@ -116,11 +144,14 @@ where
     }
 
     /// Returns an action's bindings.
-    pub fn action_bindings<T: Hash + Eq + ?Sized>(&self, id: &T) -> Option<&[SmallVec<[Button; 2]>]>
+    pub fn action_bindings<T: Hash + Eq + ?Sized>(
+        &self,
+        id: &T,
+    ) -> Option<impl Iterator<Item = &[Button]>>
     where
         AC: Borrow<T>,
     {
-        self.actions.get(id).map(|a| &**a)
+        self.actions.get(id).map(|a| a.iter().map(|a| a.as_slice()))
     }
 
     /// Gets a list of all action bindings

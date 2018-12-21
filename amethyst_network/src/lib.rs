@@ -1,17 +1,11 @@
 //! Provides a client-server networking architecture to amethyst.
 
-#![warn(missing_docs)]
+#![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
-extern crate amethyst_core;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde;
-extern crate bincode;
-extern crate laminar;
-extern crate shred;
-extern crate shrev;
-extern crate uuid;
 
 mod bundle;
 mod connection;
@@ -20,7 +14,7 @@ mod net_event;
 mod network_socket;
 mod test;
 
-pub use {
+pub use crate::{
     bundle::NetworkBundle,
     connection::{ConnectionState, NetConnection, NetIdentity},
     filter::{FilterConnected, NetFilter},

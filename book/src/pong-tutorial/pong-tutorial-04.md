@@ -113,8 +113,8 @@ Finally, let's make sure the code is working as intended by updating the `on_sta
 # fn initialise_camera(world: &mut World) { }
 # fn load_sprite_sheet(world: &mut World) -> SpriteSheetHandle { unimplemented!() }
 # struct MyState;
-# impl<'a, 'b> SimpleState<'a, 'b> for MyState {
-fn on_start(&mut self, data: StateData<GameData>) {
+# impl SimpleState for MyState {
+fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
     let world = data.world;
 
     // Load the spritesheet necessary to render the graphics.
@@ -361,9 +361,10 @@ let game_data = GameDataBuilder::default()
 # }
 ```
 
-You should now have a ball moving and bouncing off paddles and off the top and bottom
-of the screen. However, you will quickly notice that if the ball goes out of the screen
-on the right or the left, it never comes back and the game is over...
+You should now have a ball moving and bouncing off paddles and off the top
+and bottom of the screen. However, you will quickly notice that if the ball
+goes out of the screen on the right or the left, it never comes back
+and the game is over...
 
 ## Summary
 

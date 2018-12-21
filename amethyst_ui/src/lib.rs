@@ -1,38 +1,33 @@
 //! Provides components and systems to create an in game user interface.
 
 #![doc(html_logo_url = "https://www.amethyst.rs/assets/amethyst.svg")]
-#![warn(missing_docs)]
-#![cfg_attr(feature = "cargo-clippy", allow(type_complexity))] // complex project
+#![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
-extern crate amethyst_assets;
-extern crate amethyst_audio;
-extern crate amethyst_core;
-extern crate amethyst_input;
-extern crate amethyst_renderer;
-extern crate clipboard;
+use amethyst_assets;
+use amethyst_audio;
+use amethyst_core;
+
+use amethyst_renderer;
+use clipboard;
 #[macro_use]
 extern crate derivative;
-extern crate fnv;
-extern crate font_kit;
-extern crate gfx;
-extern crate gfx_glyph;
-extern crate glsl_layout;
-extern crate hibitset;
+use fnv;
+
+use gfx;
+use gfx_glyph;
+use glsl_layout;
+use hibitset;
 #[macro_use]
 extern crate log;
-extern crate ron;
+use ron;
 #[macro_use]
 extern crate serde;
-extern crate shred;
+use shred;
 #[macro_use]
 extern crate shred_derive;
-extern crate unicode_normalization;
-extern crate unicode_segmentation;
-extern crate winit;
-
-#[macro_use]
-#[cfg(feature = "profiler")]
-extern crate thread_profiler;
+use unicode_normalization;
+use unicode_segmentation;
+use winit;
 
 mod action_components;
 mod bundle;

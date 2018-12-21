@@ -286,8 +286,8 @@ use amethyst::{
 # 
 # pub struct Pong;
 # 
-# impl<'a, 'b> SimpleState<'a, 'b> for Pong {
-#     fn on_start(&mut self, data: StateData<GameData>) {
+# impl SimpleState for Pong {
+#     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
 #         let world = data.world;
 # 
 #         // Load the spritesheet necessary to render the graphics.
@@ -450,6 +450,7 @@ pub struct ScoreText {
 #         .build();
 # }
 ```
+> Don't glimpse over the `#[derive(Default)]` annotation for the `ScoreBoard` struct!
 
 `ScoreBoard` is just a container that will allow us to keep track of each
 player's score. We'll use this in another module later in this chapter, so we've
@@ -486,8 +487,8 @@ use amethyst::{
 # 
 # pub struct Pong;
 # 
-impl<'a, 'b> SimpleState<'a, 'b> for Pong {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for Pong {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
 #         let world = data.world;
 #
 #         // Load the spritesheet necessary to render the graphics.
@@ -844,8 +845,8 @@ handles to the `UiText` components that we want. Finally, we add the
 We're using `Write` here to pull in the `ScoreBoard` instead of with
 `WriteStorage` because we want mutable access to `ScoreBoard`, which is not a
 collection of components but rather a single resource item. This item is
-strictly required in all cases, but if it we didn't want it to always be
-required to exist, we could use `Option<Write<'s, ScoreBoard>>`.
+strictly required in all cases, but if we wanted it to be optional we could
+use `Option<Write<'s, ScoreBoard>>` instead.
 
 We also use `ReadExpect` to access the `ScoreText` resource immutably. Again,
 `ScoreText` is a single resource item rather than a collection of components.
