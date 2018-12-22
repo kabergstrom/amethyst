@@ -1,4 +1,3 @@
-use serde_dyn::TypeUuid;
 use amethyst_assets::*;
 
 use super::Source as Audio;

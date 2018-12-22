@@ -7,7 +7,6 @@ use gfx::{
 };
 use image::{DynamicImage, ImageFormat, RgbaImage};
 use serde::{ser::SerializeStruct, de::Error};
-use serde_dyn::TypeUuid;
 
 use amethyst_assets::{
     AssetStorage, Format, Handle, Loader, PrefabData, PrefabError, ProcessingState,

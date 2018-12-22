@@ -50,7 +50,7 @@ shred-derive = "0.5"
 shred = "0.7"
 wavefront_obj = "5.1"
 winit = { version = "0.18", features = ["serde"] }
-serde_dyn = { git = "https://github.com/kabergstrom/serde_dyn.git" }
+serde_dyn = "0.2.2"
 
 thread_profiler = { version = "0.3", optional = true }
 
