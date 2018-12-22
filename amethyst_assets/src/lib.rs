@@ -38,7 +38,7 @@ extern crate downcast;
 extern crate thread_profiler;
 
 pub use crate::{
-    asset::{Asset, Format, FormatValue, SimpleFormat, SerdeObj, Importer, ImporterValue, SimpleImporterState, SimpleImporter, AssetUUID, AssetID},
+    asset::{Asset, Format, FormatValue, SimpleFormat, SerdeObj, Importer, ImporterValue, SimpleImporterState, SimpleImporter, AssetUUID},
     cache::Cache,
     error::{Error, ErrorKind, Result, ResultExt},
     formats::RonFormat,

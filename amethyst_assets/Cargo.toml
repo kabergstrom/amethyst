@@ -39,7 +39,7 @@ thread_profiler = { version = "0.3", optional = true }
 serde_dyn = { git = "https://github.com/kabergstrom/serde_dyn.git" }
 downcast = "0.9.2"
 erased-serde = "0.3"
-uuid = { version = "0.7", features = ["v4"] }
+uuid = { version = "0.7", features = ["v4", "serde"] }
 
 [dev-dependencies]
 
