@@ -8,7 +8,6 @@ use amethyst_core::{
     nalgebra::{Vector2, Vector3},
     specs::prelude::{Component, Entity, Read, ReadExpect, VecStorage, WriteStorage},
 };
-use serde_dyn::TypeUuid;
 use crate::{
     mesh::{Mesh, MeshBuilder, MeshHandle},
     vertex::*,

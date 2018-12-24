@@ -28,17 +28,13 @@ use shred;
 extern crate shred_derive;
 #[macro_use]
 extern crate serde_dyn;
-#[macro_use]
-extern crate erased_serde;
-#[macro_use]
-extern crate downcast;
 
 #[macro_use]
 #[cfg(feature = "profiler")]
 extern crate thread_profiler;
 
 pub use crate::{
-    asset::{Asset, Format, FormatValue, SimpleFormat, SerdeObj, Importer, ImporterValue, SimpleImporterState, SimpleImporter, AssetUUID, AssetID},
+    asset::{Asset, Format, FormatValue, SimpleFormat, AssetUUID},
     cache::Cache,
     error::{Error, ErrorKind, Result, ResultExt},
     formats::RonFormat,
