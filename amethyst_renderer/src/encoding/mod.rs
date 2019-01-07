@@ -4,13 +4,16 @@ mod buffer;
 mod data;
 mod encoders_impl;
 mod stream_encoder;
+mod test;
 
 pub use self::{
-    attributes::{EncAttribute, EncAttributes, ShaderInputType},
+    attributes::{EncAttribute, EncAttributes, EncodedProp, ShaderInputType},
     buffer::EncodeBuffer,
     data::{Encode, EncodingSet},
-    stream_encoder::{EncType, IterType, StreamEncoder},
+    stream_encoder::{AnyEncoder, DataType, EncType, IterType, StreamEncoder, StreamEncoderData},
 };
+use core::hash::Hash;
+use fnv::FnvHashMap;
 use shred::SystemData;
 use std::marker::PhantomData;
 
@@ -19,59 +22,42 @@ use std::marker::PhantomData;
 
 /// A list of encoders that have to run (possibly in parallel) in order to encode
 /// the entire set of required shader attributes (shader layout).
-trait EncoderBundle<'a, 'j> {
-    type Attributes: EncAttributes;
-    type Components: EncodingSet<'j>;
-    type SystemData: SystemData<'a>;
-
-    fn encode_bundle();
-}
-
-impl<'a, 'j, A, B> EncoderBundle<'a, 'j> for (A, B)
-where
-    A: StreamEncoder<'a, 'j>,
-    B: StreamEncoder<'a, 'j>,
-{
-    type Attributes = (A::Attributes, B::Attributes);
-    type Components = (A::Components, B::Components);
-    type SystemData = (A::SystemData, B::SystemData);
-
-    fn encode_bundle() {
-        // todo: externally visible attributes should be flattened for querying
-        // (possibly at runtime? but then joining encoder bundles will possibly be harder)
-
-        // todo: prepare interleaved buffer view from flat buf
-    }
-}
+trait EncoderBundle {} // TODO
 
 /// A list of encoders that have to run (usually in sequence) in order to encode
 /// all possible component permutations for a given shader layout.
 struct LayoutEncoder {} // TODO
 
-/// Unit of work for encoding.
-struct EncodingUnit {}
-
-struct EncoderLayout {
-    stride: usize,
-}
-
-// TODO: layouts should probably support
-
-trait StaticLayout {
+pub trait StaticLayout {
     type ReturnType;
 }
-struct Layout {}
 
-struct EncoderQuery<L: StaticLayout> {
+impl StaticLayout for () {
+    type ReturnType = ();
+}
+
+pub struct Layout {}
+
+pub struct EncoderQuery<L: StaticLayout> {
     dynamic_layout: Layout,
-    phantom: PhantomData<L>,
+    _marker: PhantomData<L>,
+}
+
+impl<L: StaticLayout> EncoderQuery<L> {
+    pub fn new() -> Self {
+        Self {
+            dynamic_layout: Layout {},
+            _marker: PhantomData,
+        }
+    }
 }
 
 // a resource for querying and holding registrations
 struct WorldEncoder {
-    // available_encoders: HashMap<EncodedTypeSet, StreamEncoder>,
+    available_encoders: FnvHashMap<EncodedProp, Vec<Box<dyn AnyEncoder>>>,
 }
 
+#[derive(Debug)]
 struct EncodingError;
 
 impl WorldEncoder {
@@ -80,13 +66,18 @@ impl WorldEncoder {
     }
 
     /// Retreive the exact size of byte buffer that has to be allocated
-    fn query_size_hint<L: StaticLayout>(&self) -> usize {
+    fn query_size_hint<L: StaticLayout>(
+        &self,
+        res: &shred::Resources,
+        query: &EncoderQuery<L>,
+    ) -> usize {
         unimplemented!();
     }
 
     fn query<L: StaticLayout>(
         &self,
-        query: EncoderQuery<L>,
+        res: &shred::Resources,
+        query: &EncoderQuery<L>,
         buffer: &mut [u8],
     ) -> Result<L::ReturnType, EncodingError> {
         unimplemented!();
@@ -94,13 +85,34 @@ impl WorldEncoder {
 }
 
 #[derive(Default)]
-struct EncodingBuilder;
+struct EncodingBuilder {
+    map: FnvHashMap<EncodedProp, Vec<Box<dyn AnyEncoder>>>,
+}
+
+fn vecmap_insert<K: Eq + Hash, V>(map: &mut FnvHashMap<K, Vec<V>>, key: K, value: V) {
+    if let Some(vec) = map.get_mut(&key) {
+        vec.push(value);
+    } else {
+        map.insert(key, vec![value]);
+    }
+}
+
 impl EncodingBuilder {
     // registration might be totally compile-time
-    fn with_encoder<E: for<'a, 'j> StreamEncoder<'a, 'j>>() {
-        unimplemented!()
+    fn with_encoder<E: StreamEncoder + 'static>(mut self) -> Self {
+        use self::stream_encoder::into_any;
+
+        let enc = into_any::<E>();
+
+        for prop in enc.get_encoder_props() {
+            vecmap_insert(&mut self.map, prop, Box::new(into_any::<E>()));
+        }
+
+        self
     }
     fn build(self) -> WorldEncoder {
-        unimplemented!()
+        WorldEncoder {
+            available_encoders: self.map,
+        }
     }
 }

@@ -3,6 +3,7 @@
 
 // TODO: support more types, like boolean vectors or any scalars
 // TODO: address alignment
+#[derive(PartialEq, Eq, Hash)]
 pub enum ShaderInput {
     Vec4,
     Vec2,
@@ -16,61 +17,61 @@ pub enum ShaderInput {
 }
 
 pub trait ShaderInputType {
-    const Ty: ShaderInput;
+    const TY: ShaderInput;
     type Repr;
 }
 
 pub struct EncVec4;
 impl ShaderInputType for EncVec4 {
-    const Ty: ShaderInput = ShaderInput::Vec4;
+    const TY: ShaderInput = ShaderInput::Vec4;
     type Repr = [f32; 4];
 }
 
 pub struct EncVec2;
 impl ShaderInputType for EncVec2 {
-    const Ty: ShaderInput = ShaderInput::Vec2;
+    const TY: ShaderInput = ShaderInput::Vec2;
     type Repr = [f32; 2];
 }
 
 pub struct EncMat4x4;
 impl ShaderInputType for EncMat4x4 {
-    const Ty: ShaderInput = ShaderInput::Mat4x4;
+    const TY: ShaderInput = ShaderInput::Mat4x4;
     type Repr = [[f32; 4]; 4];
 }
 
 pub struct EncVec4i;
 impl ShaderInputType for EncVec4i {
-    const Ty: ShaderInput = ShaderInput::Vec4i;
+    const TY: ShaderInput = ShaderInput::Vec4i;
     type Repr = [i32; 4];
 }
 
 pub struct EncVec2i;
 impl ShaderInputType for EncVec2i {
-    const Ty: ShaderInput = ShaderInput::Vec2i;
+    const TY: ShaderInput = ShaderInput::Vec2i;
     type Repr = [i32; 2];
 }
 
 pub struct EncMat4x4i;
 impl ShaderInputType for EncMat4x4i {
-    const Ty: ShaderInput = ShaderInput::Mat4x4i;
+    const TY: ShaderInput = ShaderInput::Mat4x4i;
     type Repr = [[i32; 4]; 4];
 }
 
 pub struct EncVec4u;
 impl ShaderInputType for EncVec4u {
-    const Ty: ShaderInput = ShaderInput::Vec4u;
+    const TY: ShaderInput = ShaderInput::Vec4u;
     type Repr = [u32; 4];
 }
 
 pub struct EncVec2u;
 impl ShaderInputType for EncVec2u {
-    const Ty: ShaderInput = ShaderInput::Vec2u;
+    const TY: ShaderInput = ShaderInput::Vec2u;
     type Repr = [u32; 2];
 }
 
 pub struct EncMat4x4u;
 impl ShaderInputType for EncMat4x4u {
-    const Ty: ShaderInput = ShaderInput::Mat4x4u;
+    const TY: ShaderInput = ShaderInput::Mat4x4u;
     type Repr = [[u32; 4]; 4];
 }
 
@@ -103,22 +104,24 @@ pub trait EncAttribute {
     type EncodedType: ShaderInputType + EncodingValue;
 }
 
+pub type EncodedProp = (ShaderInput, &'static str);
+
 /// A compile-time list of `EncAttribute`s.
 pub trait EncAttributes {
     type EncodedType: EncodingValue;
     /// Retreive a vec of associated (type name, property, byte offset, byte size) tuples at runtime
-    fn get_props() -> Vec<(ShaderInput, &'static str)>;
+    fn get_props() -> Vec<EncodedProp>;
 }
 
 impl<A: EncAttribute> EncAttributes for A {
     type EncodedType = A::EncodedType;
-    fn get_props() -> Vec<(ShaderInput, &'static str)> {
-        vec![(A::EncodedType::Ty, A::PROPERTY)]
+    fn get_props() -> Vec<EncodedProp> {
+        vec![(A::EncodedType::TY, A::PROPERTY)]
     }
 }
 impl<A: EncAttributes, B: EncAttributes> EncAttributes for (A, B) {
     type EncodedType = (A::EncodedType, B::EncodedType);
-    fn get_props() -> Vec<(ShaderInput, &'static str)> {
+    fn get_props() -> Vec<EncodedProp> {
         let mut vec = A::get_props();
         vec.extend(B::get_props());
         vec
@@ -127,7 +130,7 @@ impl<A: EncAttributes, B: EncAttributes> EncAttributes for (A, B) {
 
 impl<A: EncAttributes, B: EncAttributes, C: EncAttributes> EncAttributes for (A, B, C) {
     type EncodedType = (A::EncodedType, B::EncodedType, C::EncodedType);
-    fn get_props() -> Vec<(ShaderInput, &'static str)> {
+    fn get_props() -> Vec<EncodedProp> {
         let mut vec = A::get_props();
         vec.extend(B::get_props());
         vec.extend(C::get_props());

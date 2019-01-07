@@ -1,22 +1,25 @@
 // example implementations
 use super::{
     attributes_impl::{DirXAttribute, DirYAttribute, Pos2DAttribute, TintAttribute},
-    EncType, Encode, EncodeBuffer, IterType, StreamEncoder,
+    DataType, EncType, Encode, EncodeBuffer, IterType, StreamEncoder, StreamEncoderData,
 };
-use amethyst_core::{nalgebra::Vector4, specs::Read, GlobalTransform};
+use crate::{Rgba, SpriteRender, SpriteSheet};
 use amethyst_assets::AssetStorage;
-use crate::{SpriteRender, SpriteSheet, Rgba};
+use amethyst_core::{nalgebra::Vector4, specs::Read, GlobalTransform};
 
 /// An encoder that encodes `Rgba` component into a stream of `vec4 tint`.
 pub struct RgbaTintEncoder;
-impl<'a: 'j, 'j> StreamEncoder<'a, 'j> for RgbaTintEncoder {
-    type Attributes = TintAttribute;
+impl<'a: 'j, 'j> StreamEncoderData<'a, 'j> for RgbaTintEncoder {
     type Components = (Encode<'a, Rgba>,);
     type SystemData = ();
-    fn encode<B: EncodeBuffer<EncType<'a, 'j, Self>>>(
+}
+
+impl StreamEncoder for RgbaTintEncoder {
+    type Attributes = TintAttribute;
+    fn encode<'a: 'j, 'j, B: EncodeBuffer<EncType<'a, 'j, Self>>>(
         buffer: &mut B,
         iter: IterType<'a, 'j, Self>,
-        system_data: Self::SystemData,
+        system_data: DataType<'a, 'j, Self>,
     ) {
         for (rgba,) in iter {
             buffer.push([rgba.0, rgba.1, rgba.2, rgba.3].into());
@@ -24,18 +27,20 @@ impl<'a: 'j, 'j> StreamEncoder<'a, 'j> for RgbaTintEncoder {
     }
 }
 
-
 /// An encoder that encodes `GlobalTransform` and `RenderSpriteFlat2D` components
 /// into streams of `vec4 pos`, `vec4 dir_x` and `vec4 dir_y`.
 pub struct SpriteTransformEncoder;
-impl<'a: 'j, 'j> StreamEncoder<'a, 'j> for SpriteTransformEncoder {
-    type Attributes = (Pos2DAttribute, DirXAttribute, DirYAttribute);
+impl<'a: 'j, 'j> StreamEncoderData<'a, 'j> for SpriteTransformEncoder {
     type Components = (Encode<'a, GlobalTransform>, Encode<'a, SpriteRender>);
     type SystemData = (Read<'a, AssetStorage<SpriteSheet>>);
-    fn encode<B: EncodeBuffer<EncType<'a, 'j, Self>>>(
+}
+
+impl StreamEncoder for SpriteTransformEncoder {
+    type Attributes = (Pos2DAttribute, DirXAttribute, DirYAttribute);
+    fn encode<'a: 'j, 'j, B: EncodeBuffer<EncType<'a, 'j, Self>>>(
         buffer: &mut B,
         iter: IterType<'a, 'j, Self>,
-        storage: Self::SystemData,
+        storage: DataType<'a, 'j, Self>,
     ) {
         for (transform, sprite_render) in iter {
             let ref sprite_sheet = storage.get(&sprite_render.sprite_sheet).unwrap();
