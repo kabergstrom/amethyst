@@ -1,7 +1,8 @@
 // example implementations
 use super::{
-    attributes_impl::{DirXAttribute, DirYAttribute, Pos2DAttribute, TintAttribute},
-    DataType, EncType, Encode, EncodeBuffer, IterType, StreamEncoder, StreamEncoderData,
+    properties_impl::{DirXProperty, DirYProperty, Pos2DProperty, TintProperty},
+    DataType, EncType, Encode, EncodeBuffer, IterItem, MaybeEncode, StreamEncoder,
+    StreamEncoderData,
 };
 use crate::{Rgba, SpriteRender, SpriteSheet};
 use amethyst_assets::AssetStorage;
@@ -10,18 +11,19 @@ use amethyst_core::{nalgebra::Vector4, specs::Read, GlobalTransform};
 /// An encoder that encodes `Rgba` component into a stream of `vec4 tint`.
 pub struct RgbaTintEncoder;
 impl<'a: 'j, 'j> StreamEncoderData<'a, 'j> for RgbaTintEncoder {
-    type Components = (Encode<'a, Rgba>,);
+    type Components = (MaybeEncode<'a, Rgba>,);
     type SystemData = ();
 }
 
 impl StreamEncoder for RgbaTintEncoder {
-    type Attributes = TintAttribute;
-    fn encode<'a: 'j, 'j, B: EncodeBuffer<EncType<'a, 'j, Self>>>(
-        buffer: &mut B,
-        iter: IterType<'a, 'j, Self>,
-        system_data: DataType<'a, 'j, Self>,
+    type Properties = TintProperty;
+    fn encode<'a: 'j, 'j>(
+        buffer: &mut impl EncodeBuffer<EncType<'a, 'j, Self>>,
+        iter: impl Iterator<Item = IterItem<'a, 'j, Self>>,
+        _system_data: DataType<'a, 'j, Self>,
     ) {
         for (rgba,) in iter {
+            let rgba = rgba.unwrap_or(&Rgba::WHITE);
             buffer.push([rgba.0, rgba.1, rgba.2, rgba.3].into());
         }
     }
@@ -36,10 +38,10 @@ impl<'a: 'j, 'j> StreamEncoderData<'a, 'j> for SpriteTransformEncoder {
 }
 
 impl StreamEncoder for SpriteTransformEncoder {
-    type Attributes = (Pos2DAttribute, DirXAttribute, DirYAttribute);
-    fn encode<'a: 'j, 'j, B: EncodeBuffer<EncType<'a, 'j, Self>>>(
-        buffer: &mut B,
-        iter: IterType<'a, 'j, Self>,
+    type Properties = (Pos2DProperty, DirXProperty, DirYProperty);
+    fn encode<'a: 'j, 'j>(
+        buffer: &mut impl EncodeBuffer<EncType<'a, 'j, Self>>,
+        iter: impl Iterator<Item = IterItem<'a, 'j, Self>>,
         storage: DataType<'a, 'j, Self>,
     ) {
         for (transform, sprite_render) in iter {

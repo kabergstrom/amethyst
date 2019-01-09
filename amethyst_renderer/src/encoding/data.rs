@@ -1,15 +1,22 @@
 use amethyst_core::specs::{
-    join::{Join, JoinIter},
+    join::{Join, JoinIter, MaybeJoin},
     world::Index,
     Component, ReadStorage, SystemData,
 };
 use shred::{ResourceId, Resources};
 
-/// A read-only access to a component storage. Component types listed in the list of `Encoder`s
+/// A read-only access to a component storage. Component types listed in the list of `Encoder`s or `MaybeEncoder`s
 /// on a `StreamEncoder` trait are used for scheduling the encoding for rendering.
 ///
 /// Constrained in the same way as `ReadStorage`. You can't use `WriteStorage` with the same inner type at the same time.
 pub struct Encode<'a, A: Component>(ReadStorage<'a, A>);
+
+/// A read-only access to a optional component storage. Component types listed in the list of `Encoder`s
+/// on a `StreamEncoder` trait are used for scheduling the encoding for rendering.
+/// Encoder has to push a value to the buffer even if the encoded optional component is `None`.
+///
+/// Constrained in the same way as `ReadStorage`. You can't use `WriteStorage` with the same inner type at the same time.
+pub struct MaybeEncode<'a, A: Component>(ReadStorage<'a, A>);
 
 impl<'a, T> SystemData<'a> for Encode<'a, T>
 where
@@ -21,6 +28,27 @@ where
 
     fn fetch(res: &'a Resources) -> Self {
         Encode(<ReadStorage<'a, T> as SystemData<'a>>::fetch(res))
+    }
+
+    fn reads() -> Vec<ResourceId> {
+        <ReadStorage<'a, T> as SystemData<'a>>::reads()
+    }
+
+    fn writes() -> Vec<ResourceId> {
+        <ReadStorage<'a, T> as SystemData<'a>>::writes()
+    }
+}
+
+impl<'a, T> SystemData<'a> for MaybeEncode<'a, T>
+where
+    T: Component,
+{
+    fn setup(res: &mut Resources) {
+        <ReadStorage<'a, T> as SystemData<'a>>::setup(res)
+    }
+
+    fn fetch(res: &'a Resources) -> Self {
+        MaybeEncode(<ReadStorage<'a, T> as SystemData<'a>>::fetch(res))
     }
 
     fn reads() -> Vec<ResourceId> {
@@ -44,14 +72,30 @@ impl<'a: 'j, 'j, A: Component> Join for &'j Encode<'a, A> {
     }
 }
 
+impl<'a: 'j, 'j, A: Component> Join for &'j MaybeEncode<'a, A> {
+    type Mask = <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::Mask;
+    type Value = <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::Value;
+    type Type = <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::Type;
+    unsafe fn open(self) -> (Self::Mask, Self::Value) {
+        Join::open(self.0.maybe())
+    }
+    unsafe fn get(value: &mut Self::Value, id: Index) -> Self::Type {
+        <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::get(value, id)
+    }
+}
+
 /// A read-only joinable composable list of component types.
 /// TODO: Allow for constraining the iterated list of components by external BitVec
 pub trait EncodingSet<'j> {
+    /// Join representation of encoding set
     type Joined: Join;
+    /// Get joinable value wrapped by `EncodingSet`
     fn inner(&'j self) -> Self::Joined;
+    /// Join on all elements of encoding set, retreive the iterator for encoding.
     fn join(&'j self) -> JoinIter<Self::Joined> {
         self.inner().join()
     }
+    /// Join on all elements of encoding set, bounded externally. retreive the iterator for encoding.
     fn join_with<J: Join>(&'j self, other: J) -> JoinIter<(Self::Joined, J)> {
         (self.inner(), other).join()
     }
@@ -61,6 +105,13 @@ impl<'j, 'a: 'j, A: Component> EncodingSet<'j> for Encode<'a, A> {
     type Joined = &'j ReadStorage<'a, A>;
     fn inner(&'j self) -> Self::Joined {
         &self.0
+    }
+}
+
+impl<'j, 'a: 'j, A: Component> EncodingSet<'j> for MaybeEncode<'a, A> {
+    type Joined = MaybeJoin<&'j ReadStorage<'a, A>>;
+    fn inner(&'j self) -> Self::Joined {
+        self.0.maybe()
     }
 }
 

@@ -1,20 +1,20 @@
-use crate::encoding::attributes::EncodedProp;
-use crate::encoding::{EncAttributes, EncodeBuffer, EncodingSet};
-use amethyst_core::specs::{join::JoinIter, SystemData};
+use crate::encoding::properties::EncodedProp;
+use crate::encoding::{EncProperties, EncodeBuffer, EncodingSet};
+use amethyst_core::specs::{join::Join, SystemData};
 use core::any::Any;
 
-/// A main trait that defines a strategy to encode specified stream of attributes
+/// A main trait that defines a strategy to encode specified stream of properties
 /// by iteration over declared set of components in the world. The encoder might also
 /// use additional resources from the world.
 ///
 /// Every encoder must push exactly one value per iterated entity to the buffer.
 pub trait StreamEncoder {
-    type Attributes: EncAttributes;
+    type Properties: EncProperties;
 
-    fn encode<'a: 'j, 'j, B: EncodeBuffer<EncType<'a, 'j, Self>>>(
-        buffer: &mut B,
-        iter: IterType<'a, 'j, Self>,
-        system_data: DataType<'a, 'j, Self>,
+    fn encode<'a: 'j, 'j>(
+        buffer: &mut impl EncodeBuffer<EncType<'a, 'j, Self>>,
+        iter: impl Iterator<Item = IterItem<'a, 'j, Self>>,
+        storage: DataType<'a, 'j, Self>,
     ) where
         Self: StreamEncoderData<'a, 'j>;
 }
@@ -24,18 +24,17 @@ pub trait StreamEncoderData<'a, 'j> {
     type SystemData: SystemData<'a>;
 }
 
-pub type EncType<'a, 'j, T> = <<T as StreamEncoder>::Attributes as EncAttributes>::EncodedType;
-pub type IterType<'a, 'j, T> =
-    JoinIter<<<T as StreamEncoderData<'a, 'j>>::Components as EncodingSet<'j>>::Joined>;
+pub type EncType<'a, 'j, T> = <<T as StreamEncoder>::Properties as EncProperties>::EncodedType;
+pub type IterItem<'a, 'j, T> =
+    <<<T as StreamEncoderData<'a, 'j>>::Components as EncodingSet<'j>>::Joined as Join>::Type;
 pub type DataType<'a, 'j, T> = <T as StreamEncoderData<'a, 'j>>::SystemData;
 
-fn encoder_encode<'a: 'j, 'j, T, B>(
-    buffer: &mut B,
-    iter: IterType<'a, 'j, T>,
+fn encoder_encode<'a: 'j, 'j, T>(
+    buffer: &mut impl EncodeBuffer<EncType<'a, 'j, T>>,
+    iter: impl Iterator<Item = IterItem<'a, 'j, T>>,
     system_data: DataType<'a, 'j, T>,
 ) where
     T: StreamEncoder + StreamEncoderData<'a, 'j>,
-    B: EncodeBuffer<EncType<'a, 'j, T>>,
 {
     T::encode(buffer, iter, system_data)
 }
@@ -56,7 +55,7 @@ where
     T: StreamEncoder + 'static,
 {
     fn get_encoder_props(&self) -> Vec<EncodedProp> {
-        <T::Attributes as EncAttributes>::get_props()
+        <T::Properties as EncProperties>::get_props()
     }
 }
 
