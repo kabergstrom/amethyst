@@ -1,5 +1,6 @@
-use crate::encoding::properties::EncodedProp;
-use crate::encoding::{EncProperties, EncodeBuffer, EncodingSet};
+use crate::encoding::{
+    properties::EncodedProp, DeferredEncodingSet, EncProperties, EncodeBuffer, EncodingSet,
+};
 use amethyst_core::specs::{join::Join, SystemData};
 use core::any::Any;
 
@@ -16,25 +17,27 @@ pub trait StreamEncoder {
         iter: impl Iterator<Item = IterItem<'a, 'j, Self>>,
         storage: DataType<'a, 'j, Self>,
     ) where
-        Self: StreamEncoderData<'a, 'j>;
+        Self: StreamEncoderData<'a>,
+        <Self as StreamEncoderData<'a>>::Components: EncodingSet<'j>;
 }
 
-pub trait StreamEncoderData<'a, 'j> {
-    type Components: EncodingSet<'j>;
+pub trait StreamEncoderData<'a> {
+    type Components: DeferredEncodingSet;
     type SystemData: SystemData<'a>;
 }
 
 pub type EncType<'a, 'j, T> = <<T as StreamEncoder>::Properties as EncProperties>::EncodedType;
 pub type IterItem<'a, 'j, T> =
-    <<<T as StreamEncoderData<'a, 'j>>::Components as EncodingSet<'j>>::Joined as Join>::Type;
-pub type DataType<'a, 'j, T> = <T as StreamEncoderData<'a, 'j>>::SystemData;
+    <<<T as StreamEncoderData<'a>>::Components as EncodingSet<'j>>::Joined as Join>::Type;
+pub type DataType<'a, 'j, T> = <T as StreamEncoderData<'a>>::SystemData;
 
 fn encoder_encode<'a: 'j, 'j, T>(
     buffer: &mut impl EncodeBuffer<EncType<'a, 'j, T>>,
     iter: impl Iterator<Item = IterItem<'a, 'j, T>>,
     system_data: DataType<'a, 'j, T>,
 ) where
-    T: StreamEncoder + StreamEncoderData<'a, 'j>,
+    T: StreamEncoder + StreamEncoderData<'a>,
+    <T as StreamEncoderData<'a>>::Components: EncodingSet<'j>,
 {
     T::encode(buffer, iter, system_data)
 }

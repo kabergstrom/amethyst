@@ -84,6 +84,8 @@ impl<'a: 'j, 'j, A: Component> Join for &'j MaybeEncode<'a, A> {
     }
 }
 
+pub trait DeferredEncodingSet: Sized {}
+
 /// A read-only joinable composable list of component types.
 /// TODO: Allow for constraining the iterated list of components by external BitVec
 pub trait EncodingSet<'j> {
@@ -100,6 +102,9 @@ pub trait EncodingSet<'j> {
         (self.inner(), other).join()
     }
 }
+
+impl<'a, A: Component> DeferredEncodingSet for Encode<'a, A> {}
+impl<'a, A: Component> DeferredEncodingSet for MaybeEncode<'a, A> {}
 
 impl<'j, 'a: 'j, A: Component> EncodingSet<'j> for Encode<'a, A> {
     type Joined = &'j ReadStorage<'a, A>;
@@ -118,6 +123,10 @@ impl<'j, 'a: 'j, A: Component> EncodingSet<'j> for MaybeEncode<'a, A> {
 macro_rules! impl_encoding_set {
     // use variables to indicate the arity of the tuple
     ($($from:ident),*) => {
+        impl<$($from,)*> DeferredEncodingSet for ($($from),*,)
+            where $($from: DeferredEncodingSet),*,
+        {}
+
         impl<'j, $($from,)*> EncodingSet<'j> for ($($from),*,)
             where $($from: EncodingSet<'j>),*,
         {

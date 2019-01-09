@@ -10,7 +10,7 @@ use amethyst_core::{nalgebra::Vector4, specs::Read, GlobalTransform};
 
 /// An encoder that encodes `Rgba` component into a stream of `vec4 tint`.
 pub struct RgbaTintEncoder;
-impl<'a: 'j, 'j> StreamEncoderData<'a, 'j> for RgbaTintEncoder {
+impl<'a> StreamEncoderData<'a> for RgbaTintEncoder {
     type Components = (MaybeEncode<'a, Rgba>,);
     type SystemData = ();
 }
@@ -32,7 +32,7 @@ impl StreamEncoder for RgbaTintEncoder {
 /// An encoder that encodes `GlobalTransform` and `RenderSpriteFlat2D` components
 /// into streams of `vec4 pos`, `vec4 dir_x` and `vec4 dir_y`.
 pub struct SpriteTransformEncoder;
-impl<'a: 'j, 'j> StreamEncoderData<'a, 'j> for SpriteTransformEncoder {
+impl<'a> StreamEncoderData<'a> for SpriteTransformEncoder {
     type Components = (Encode<'a, GlobalTransform>, Encode<'a, SpriteRender>);
     type SystemData = (Read<'a, AssetStorage<SpriteSheet>>);
 }

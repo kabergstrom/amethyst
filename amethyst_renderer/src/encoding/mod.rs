@@ -10,7 +10,7 @@ mod test;
 
 pub use self::{
     buffer::EncodeBuffer,
-    data::{Encode, EncodingSet, MaybeEncode},
+    data::{DeferredEncodingSet, Encode, EncodingSet, MaybeEncode},
     properties::{EncProperties, EncProperty, EncodedProp, ShaderInput, ShaderInputType},
     stream_encoder::{AnyEncoder, DataType, EncType, IterItem, StreamEncoder, StreamEncoderData},
 };
