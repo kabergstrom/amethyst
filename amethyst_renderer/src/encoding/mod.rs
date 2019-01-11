@@ -10,9 +10,9 @@ mod test;
 
 pub use self::{
     buffer::EncodeBuffer,
-    data::{DeferredEncodingSet, Encode, EncodingSet, MaybeEncode},
+    data::{Encode, EncodingData, EncodingJoin, EncodingSet, MaybeEncode},
     properties::{EncProperties, EncProperty, EncodedProp, ShaderInput, ShaderInputType},
-    stream_encoder::{AnyEncoder, DataType, EncType, IterItem, StreamEncoder, StreamEncoderData},
+    stream_encoder::{AnyEncoder, DataType, EncType, IterItem, StreamEncoder},
 };
 use core::hash::Hash;
 use fnv::{FnvHashMap, FnvHashSet};
@@ -24,6 +24,7 @@ use std::rc::Rc;
 /// A list of encoders that have to run (possibly in parallel) in order to encode
 /// the entire set of required shader properties (shader layout).
 pub struct EncoderBundle {
+    #[allow(dead_code)]
     encoders: Vec<Rc<dyn AnyEncoder>>,
 }
 
@@ -32,7 +33,7 @@ impl EncoderBundle {
         Self { encoders }
     }
 
-    fn count(&self, res: &shred::Resources) -> usize {
+    fn count(&self, _res: &shred::Resources) -> usize {
         0
     }
 }
@@ -72,9 +73,8 @@ impl EncoderQuery {
     }
 }
 
-// a resource for querying and holding registrations
+/// A resource for encoder querying and holding encoder registrations
 pub struct WorldEncoder {
-    // encoders_by_props: FnvHashMap<EncodedProp, Vec<Rc<dyn AnyEncoder>>>,
     available_encoders: Vec<Rc<dyn AnyEncoder>>,
     layout_cache: FnvHashMap<EncoderQuery, LayoutEncoder>,
 }
@@ -105,7 +105,7 @@ impl WorldEncoder {
         let back_map = self
             .available_encoders
             .iter()
-            .map(|enc| (enc.get_encoder_props(), enc))
+            .map(|enc| (enc.get_props(), enc))
             .collect::<FnvHashMap<_, _>>();
 
         let prop_groups = back_map.keys().collect::<Vec<_>>();
@@ -201,21 +201,12 @@ pub struct EncodingBuilder {
 }
 
 impl EncodingBuilder {
-    // registration might be totally compile-time
-    pub fn with_encoder<E: StreamEncoder + 'static>(mut self) -> Self {
+    pub fn with_encoder<E: for<'a> StreamEncoder<'a> + 'static>(mut self) -> Self {
         use self::stream_encoder::into_any;
         self.encoders.push(Rc::new(into_any::<E>()));
         self
     }
     pub fn build(self) -> WorldEncoder {
-        // let mut encoders_by_props = FnvHashMap::default();
-
-        // for encoder in self.encoders {
-        //     for prop in encoder.get_encoder_props() {
-        //         vecmap_insert(&mut encoders_by_props, prop, encoder.clone());
-        //     }
-        // }
-
         WorldEncoder {
             available_encoders: self.encoders,
             layout_cache: Default::default(),

@@ -1,7 +1,7 @@
 use crate::encoding::{
-    properties::EncodedProp, DeferredEncodingSet, EncProperties, EncodeBuffer, EncodingSet,
+    data::EncodingDef, properties::EncodedProp, EncProperties, EncodeBuffer, EncodingSet,
 };
-use amethyst_core::specs::{join::Join, SystemData};
+use amethyst_core::specs::SystemData;
 use core::any::Any;
 
 /// A main trait that defines a strategy to encode specified stream of properties
@@ -9,60 +9,68 @@ use core::any::Any;
 /// use additional resources from the world.
 ///
 /// Every encoder must push exactly one value per iterated entity to the buffer.
-pub trait StreamEncoder {
+pub trait StreamEncoder<'a> {
     type Properties: EncProperties;
+    type Components: EncodingDef;
+    type SystemData: SystemData<'a>;
 
-    fn encode<'a: 'j, 'j>(
+    fn get_props() -> Vec<EncodedProp> {
+        Self::Properties::get_props()
+    }
+
+    fn encode<'j>(
         buffer: &mut impl EncodeBuffer<EncType<'a, 'j, Self>>,
         iter: impl Iterator<Item = IterItem<'a, 'j, Self>>,
-        storage: DataType<'a, 'j, Self>,
-    ) where
-        Self: StreamEncoderData<'a>,
-        <Self as StreamEncoderData<'a>>::Components: EncodingSet<'j>;
+        system_data: DataType<'a, Self>,
+    );
 }
 
-pub trait StreamEncoderData<'a> {
-    type Components: DeferredEncodingSet;
-    type SystemData: SystemData<'a>;
-}
+pub type EncType<'a, 'j, T> = <<T as StreamEncoder<'a>>::Properties as EncProperties>::EncodedType;
+pub type IterItem<'a, 'j, T> = <<T as StreamEncoder<'a>>::Components as EncodingSet<'j>>::IterItem;
+pub type DataType<'a, T> = <T as StreamEncoder<'a>>::SystemData;
 
-pub type EncType<'a, 'j, T> = <<T as StreamEncoder>::Properties as EncProperties>::EncodedType;
-pub type IterItem<'a, 'j, T> =
-    <<<T as StreamEncoderData<'a>>::Components as EncodingSet<'j>>::Joined as Join>::Type;
-pub type DataType<'a, 'j, T> = <T as StreamEncoderData<'a>>::SystemData;
-
-fn encoder_encode<'a: 'j, 'j, T>(
-    buffer: &mut impl EncodeBuffer<EncType<'a, 'j, T>>,
-    iter: impl Iterator<Item = IterItem<'a, 'j, T>>,
-    system_data: DataType<'a, 'j, T>,
-) where
-    T: StreamEncoder + StreamEncoderData<'a>,
-    <T as StreamEncoderData<'a>>::Components: EncodingSet<'j>,
-{
-    T::encode(buffer, iter, system_data)
-}
+// fn encoder_encode<'a: 'j, 'j, T>(
+//     buffer: &mut impl EncodeBuffer<EncType<'a, 'j, T>>,
+//     iter: impl Iterator<Item = IterItem<'a, 'j, T>>,
+//     system_data: DataType<'a, 'j, T>,
+// ) where
+//     T: StreamEncoder<'a>,
+//     <T as StreamEncoder<'a>>::Components: EncodingSet<'j>,
+// {
+//     T::encode(buffer, iter, system_data)
+// }
 
 struct AnyEncoderImpl<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
-unsafe impl<T: StreamEncoder> Send for AnyEncoderImpl<T> {}
-unsafe impl<T: StreamEncoder> Sync for AnyEncoderImpl<T> {}
+unsafe impl<T: for<'a> StreamEncoder<'a>> Send for AnyEncoderImpl<T> {}
+unsafe impl<T: for<'a> StreamEncoder<'a>> Sync for AnyEncoderImpl<T> {}
 
 pub trait AnyEncoder: Any + Send + Sync {
-    fn get_encoder_props(&self) -> Vec<EncodedProp>;
+    fn get_props(&self) -> Vec<EncodedProp>;
+    fn get_count<'a>(&self, res: &'a shred::Resources) -> usize;
 }
 
-impl<T> AnyEncoder for AnyEncoderImpl<T>
-where
-    T: StreamEncoder + 'static,
-{
-    fn get_encoder_props(&self) -> Vec<EncodedProp> {
-        <T::Properties as EncProperties>::get_props()
+impl<T: for<'a> StreamEncoder<'a> + 'static> AnyEncoder for AnyEncoderImpl<T> {
+    fn get_props(&self) -> Vec<EncodedProp> {
+        T::get_props()
+    }
+
+    fn get_count<'a>(&self, res: &'a shred::Resources) -> usize {
+        let data = T::Components::fetch(res);
+        // this fails
+        // let joinable = T::Components::joinable(&data);
+
+        // the trait bound `<T as StreamEncoder<'_>>::Components: EncodingJoin<'_, '_>` is not satisfied
+        // the trait `EncodingJoin<'_, '_>` is not implemented for `<T as StreamEncoder<'_>>::Components`
+        // help: consider adding a `where <T as StreamEncoder<'_>>::Components: EncodingJoin<'_, '_>` bound
+
+        unimplemented!();
     }
 }
 
-pub fn into_any<T: StreamEncoder + 'static>() -> impl AnyEncoder {
+pub fn into_any<T: for<'a> StreamEncoder<'a> + 'static>() -> impl AnyEncoder {
     AnyEncoderImpl::<T> {
         _marker: std::marker::PhantomData,
     }

@@ -129,10 +129,10 @@ use winit;
 
 use amethyst_core;
 
+pub mod encoding;
 pub mod error;
 pub mod mouse;
 pub mod pipe;
-pub mod encoding;
 
 #[macro_use]
 mod macros;
