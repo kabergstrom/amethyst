@@ -128,21 +128,52 @@ impl ShaderInputType for EncMesh {
 /// into the corresponding output of an encoder.
 pub trait EncodingValue {
     type Value;
+    type OptValue;
+    fn resolve(optional: Self::OptValue, fallback: Self::Value) -> Self::Value;
 }
 
 impl<A: ShaderInputType> EncodingValue for A {
     type Value = A::Repr;
+    type OptValue = Option<A::Repr>;
+    fn resolve(optional: Self::OptValue, fallback: Self::Value) -> Self::Value {
+        optional.unwrap_or(fallback)
+    }
 }
 
-impl<A: EncodingValue, B: EncodingValue> EncodingValue for (A, B) {
-    type Value = (A::Value, B::Value);
+macro_rules! impl_encoding_value {
+    ($($from:ident $idx:tt),*) => {
+        impl<$($from,)*> EncodingValue for ($($from),*,)
+            where $($from: EncodingValue),*,
+        {
+            type Value = ($($from::Value),*,);
+            type OptValue = ($($from::OptValue),*,);
+
+            #[allow(non_snake_case)]
+            fn resolve(optional: Self::OptValue, fallback: Self::Value) -> Self::Value {
+                (
+                    $(<$from as EncodingValue>::resolve(optional.$idx, fallback.$idx)),*,
+                )
+            }
+        }
+    }
 }
 
-impl<A: EncodingValue, B: EncodingValue, C: EncodingValue> EncodingValue for (A, B, C) {
-    type Value = (A::Value, B::Value, C::Value);
-}
-
-// TODO: more tuple implementations in a macro
+impl_encoding_value! {A 0}
+impl_encoding_value! {A 0, B 1}
+impl_encoding_value! {A 0, B 1, C 2}
+impl_encoding_value! {A 0, B 1, C 2, D 3}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6 }
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10, L 11}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10, L 11, M 12}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10, L 11, M 12, N 13}
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10, L 11, M 12, N 13, O 14 }
+impl_encoding_value! {A 0, B 1, C 2, D 3, E 4, F 5, G 6, H 7, I 8, J 9, K 10, L 11, M 12, N 13, O 14 , P 15}
 
 /// A compile-time definition of a shader property to encode.
 ///
@@ -158,6 +189,7 @@ pub trait EncProperty {
     fn prop() -> EncodedProp {
         (Self::EncodedType::TY, Self::PROPERTY)
     }
+    fn fallback() -> <Self::EncodedType as EncodingValue>::Value;
 }
 
 /// A runtime representation for unique encodable shader input property
@@ -169,12 +201,24 @@ pub trait EncProperties {
     type EncodedType: EncodingValue;
     /// Retreive a vec of associated (type name, property, byte offset, byte size) tuples at runtime
     fn get_props() -> Vec<EncodedProp>;
+
+    fn fallback() -> <Self::EncodedType as EncodingValue>::Value;
+    fn resolve(
+        optional: <Self::EncodedType as EncodingValue>::OptValue,
+    ) -> <Self::EncodedType as EncodingValue>::Value {
+        <Self::EncodedType as EncodingValue>::resolve(optional, Self::fallback())
+    }
 }
 
 impl<A: EncProperty> EncProperties for A {
     type EncodedType = A::EncodedType;
+
     fn get_props() -> Vec<EncodedProp> {
         vec![A::prop()]
+    }
+
+    fn fallback() -> <Self::EncodedType as EncodingValue>::Value {
+        A::fallback()
     }
 }
 impl<A: EncProperties, B: EncProperties> EncProperties for (A, B) {
@@ -183,6 +227,9 @@ impl<A: EncProperties, B: EncProperties> EncProperties for (A, B) {
         let mut vec = A::get_props();
         vec.extend(B::get_props());
         vec
+    }
+    fn fallback() -> <Self::EncodedType as EncodingValue>::Value {
+        (A::fallback(), B::fallback())
     }
 }
 
@@ -193,6 +240,9 @@ impl<A: EncProperties, B: EncProperties, C: EncProperties> EncProperties for (A,
         vec.extend(B::get_props());
         vec.extend(C::get_props());
         vec
+    }
+    fn fallback() -> <Self::EncodedType as EncodingValue>::Value {
+        (A::fallback(), B::fallback(), C::fallback())
     }
 }
 

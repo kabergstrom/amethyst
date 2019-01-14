@@ -1,5 +1,7 @@
+pub mod bitset;
 mod buffer;
 mod data;
+mod query;
 mod encoders_impl;
 mod properties;
 mod properties_impl;
@@ -10,7 +12,7 @@ mod test;
 
 pub use self::{
     buffer::EncodeBuffer,
-    data::{Encode, EncodingData, EncodingJoin, EncodingSet, MaybeEncode},
+    data::{Encode, EncodingData, FetchedData},
     properties::{EncProperties, EncProperty, EncodedProp, ShaderInput, ShaderInputType},
     stream_encoder::{AnyEncoder, DataType, EncType, IterItem, StreamEncoder},
 };

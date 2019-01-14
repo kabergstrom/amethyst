@@ -1,179 +1,73 @@
+use super::bitset::VecBitSet;
 use amethyst_core::specs::{
-    join::{Join, JoinIter, MaybeJoin},
-    world::Index,
-    Component, ReadStorage, SystemData,
+    storage::GenericReadStorage, storage::UnprotectedStorage, world::Index, Component, ReadStorage,
+    SystemData,
 };
 use hibitset::BitSetAll;
-use hibitset::BitSetLike;
-use shred::{ResourceId, Resources};
 
-/// A read-only access to a component storage. Component types listed in the list of `Encoder`s or `MaybeEncoder`s
+/// A read-only access to a component storage. Component types listed in the list of `Encoder`s
 /// on a `StreamEncoder` trait are used for scheduling the encoding for rendering.
 ///
 /// Constrained in the same way as `ReadStorage`. You can't use `WriteStorage` with the same inner type at the same time.
 pub struct Encode<A: Component>(std::marker::PhantomData<A>);
 
-/// A read-only access to a optional component storage. Component types listed in the list of `Encoder`s
-/// on a `StreamEncoder` trait are used for scheduling the encoding for rendering.
-/// Encoder has to push a value to the buffer even if the encoded optional component is `None`.
-///
-/// Constrained in the same way as `ReadStorage`. You can't use `WriteStorage` with the same inner type at the same time.
-pub struct MaybeEncode<A: Component>(std::marker::PhantomData<A>);
-
-// impl<'a, T> SystemData<'a> for Encode<T>
-// where
-//     T: Component,
-// {
-//     fn setup(res: &mut Resources) {
-//         <ReadStorage<'a, T> as SystemData<'a>>::setup(res)
-//     }
-
-//     fn fetch(res: &'a Resources) -> Self {
-//         Encode(<ReadStorage<'a, T> as SystemData<'a>>::fetch(res))
-//     }
-
-//     fn reads() -> Vec<ResourceId> {
-//         <ReadStorage<'a, T> as SystemData<'a>>::reads()
-//     }
-
-//     fn writes() -> Vec<ResourceId> {
-//         <ReadStorage<'a, T> as SystemData<'a>>::writes()
-//     }
-// }
-
-// impl<'a, T> SystemData<'a> for MaybeEncode<T>
-// where
-//     T: Component,
-// {
-//     fn setup(res: &mut Resources) {
-//         <ReadStorage<'a, T> as SystemData<'a>>::setup(res)
-//     }
-
-//     fn fetch(res: &'a Resources) -> Self {
-//         MaybeEncode(<ReadStorage<'a, T> as SystemData<'a>>::fetch(res))
-//     }
-
-//     fn reads() -> Vec<ResourceId> {
-//         <ReadStorage<'a, T> as SystemData<'a>>::reads()
-//     }
-
-//     fn writes() -> Vec<ResourceId> {
-//         <ReadStorage<'a, T> as SystemData<'a>>::writes()
-//     }
-// }
-
-// impl<'a: 'j, 'j, A: Component> Join for &'j Encode<'a, A> {
-//     type Mask = <&'j ReadStorage<'a, A> as Join>::Mask;
-//     type Value = <&'j ReadStorage<'a, A> as Join>::Value;
-//     type Type = <&'j ReadStorage<'a, A> as Join>::Type;
-//     unsafe fn open(self) -> (Self::Mask, Self::Value) {
-//         Join::open(&self.0)
-//     }
-//     unsafe fn get(value: &mut Self::Value, id: Index) -> Self::Type {
-//         <&'j ReadStorage<'a, A> as Join>::get(value, id)
-//     }
-// }
-
-// impl<'a: 'j, 'j, A: Component> Join for &'j MaybeEncode<'a, A> {
-//     type Mask = <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::Mask;
-//     type Value = <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::Value;
-//     type Type = <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::Type;
-//     unsafe fn open(self) -> (Self::Mask, Self::Value) {
-//         Join::open(self.0.maybe())
-//     }
-//     unsafe fn get(value: &mut Self::Value, id: Index) -> Self::Type {
-//         <MaybeJoin<&'j ReadStorage<'a, A>> as Join>::get(value, id)
-//     }
-// }
-
 /// A read-only joinable composable list of component types.
-/// TODO: Allow for constraining the iterated list of components by external BitVec
-pub trait EncodingSet<'j> {
-    /// Join representation of encoding set
-    type IterItem;
-    // /// Get joinable value wrapped by `EncodingSet`
-    // fn inner(&'j self) -> Self::Joined;
-    // /// Join on all elements of encoding set, retreive the iterator for encoding.
-    // fn join(&'j self) -> JoinIter<Self::Joined> {
-    //     self.inner().join()
-    // }
-    // /// Join on all elements of encoding set, bounded externally. retreive the iterator for encoding.
-    // fn join_with<J: Join>(&'j self, other: J) -> JoinIter<(Self::Joined, J)> {
-    //     (self.inner(), other).join()
-    // }
+// pub trait EncodingSet<'j> {
+//     /// Join representation of encoding set
+//     type IterItem;
+// }
+
+pub trait FetchedData<'j> {
+    type Ref;
 }
 
 pub trait EncodingData<'a> {
-    type SystemData: SystemData<'a>; // + for<'j> EncodingStorageJoin<'j>;
+    type SystemData: SystemData<'a>;
+    type FetchedData: for<'j> FetchedData<'j>;
+
+    fn get_masks<'j>(data: &'j Self::SystemData) -> VecBitSet<'j>;
+    fn get_data<'j>(
+        data: &'j Self::SystemData,
+        index: Index,
+    ) -> <Self::FetchedData as FetchedData<'j>>::Ref;
 }
 
 pub trait EncodingDefItem {
     type Fetched: Component;
+    const BOUND: bool;
 }
+
 pub trait IterableEncodingDefItem<'j> {
     type IterType: 'j;
-}
-pub trait JoinedEncodingDefItem<'a, 'j> {
-    type Storage: SystemData<'a> + 'j;
-    type Joinable: Join;
-    fn get_joinable(storage: &'j Self::Storage) -> Self::Joinable;
 }
 
 pub trait EncodingDef
 where
-    for<'j> Self: EncodingSet<'j>,
+    // for<'j> Self: EncodingSet<'j>,
     for<'a> Self: EncodingData<'a>,
 {
     fn fetch<'a>(res: &'a shred::Resources) -> <Self as EncodingData<'a>>::SystemData {
         SystemData::<'a>::fetch(res)
     }
 
-    fn joinable<'a: 'j, 'j>(
-        res: &'j <Self as EncodingData<'a>>::SystemData,
-    ) -> <Self as EncodingJoin<'a, 'j>>::Joinable
-    where
-        Self: EncodingJoin<'a, 'j>;
+    fn get_masks<'a, 'j>(data: &'j <Self as EncodingData<'a>>::SystemData) -> VecBitSet<'j> {
+        <Self as EncodingData<'a>>::get_masks(data)
+    }
+
+    fn get_data<'a, 'j>(
+        data: &'j <Self as EncodingData<'a>>::SystemData,
+        index: Index,
+    ) -> <<Self as EncodingData<'a>>::FetchedData as FetchedData<'j>>::Ref {
+        <Self as EncodingData<'a>>::get_data(data, index)
+    }
 }
 
 impl<A: Component> EncodingDefItem for Encode<A> {
     type Fetched = A;
+    const BOUND: bool = true;
 }
 impl<'j, A: Component + 'j> IterableEncodingDefItem<'j> for Encode<A> {
     type IterType = &'j A;
-}
-impl<A: Component> EncodingDefItem for MaybeEncode<A> {
-    type Fetched = A;
-}
-impl<'j, A: Component + 'j> IterableEncodingDefItem<'j> for MaybeEncode<A> {
-    type IterType = Option<&'j A>;
-}
-
-impl<'a: 'j, 'j, A: Component + 'a + 'j> JoinedEncodingDefItem<'a, 'j> for Encode<A> {
-    type Storage = ReadStorage<'a, A>;
-    type Joinable = &'j ReadStorage<'a, A>;
-    fn get_joinable(storage: &'j Self::Storage) -> Self::Joinable {
-        storage
-    }
-}
-impl<'a: 'j, 'j, A: Component + 'a + 'j> JoinedEncodingDefItem<'a, 'j> for MaybeEncode<A> {
-    type Storage = ReadStorage<'a, A>;
-    type Joinable = MaybeJoin<&'j ReadStorage<'a, A>>;
-    fn get_joinable(storage: &'j Self::Storage) -> Self::Joinable {
-        storage.maybe()
-    }
-}
-pub trait EncodingJoin<'a: 'j, 'j> {
-    type SystemData: SystemData<'a> + 'j;
-    type Joinable;
-    fn joinable(data: &'j Self::SystemData) -> Self::Joinable;
-}
-
-pub trait EncodingStorageJoin<'j>
-where
-    Self: 'j,
-{
-    type Joinable;
-    fn joinable(data: &'j Self) -> Self::Joinable;
 }
 
 macro_rules! impl_encoding_set {
@@ -182,60 +76,55 @@ macro_rules! impl_encoding_set {
         impl<$($from,)*> EncodingDef for ($($from),*,)
             where
                 $($from: EncodingDefItem),*,
-                for<'j> Self: EncodingSet<'j>,
+                // for<'j> Self: EncodingSet<'j>,
                 for<'a> Self: EncodingData<'a>,
         {
-            fn joinable<'a: 'j, 'j>(data: &'j <Self as EncodingData<'a>>::SystemData) -> <Self as EncodingJoin<'a, 'j>>::Joinable
-            where
-                Self: EncodingJoin<'a, 'j>,
-            {
-                // Transmute because of this error. We can't express the euqlity of those in the typesystem,
-                // but it always guarenteed to be the case.
-                // It should be possible to avoid once generic associated lifetimes are stable.
-                // note: expected type `&'j <(A, B, ..) as encoding::data::EncodingJoin<'a, 'j>>::SystemData`
-                //          found type `&'j <(A, B, ..) as encoding::data::EncodingData<'a>>::SystemData`
-                // <Self as EncodingJoin<'a, 'j>>::joinable(data)
-                <Self as EncodingJoin<'a, 'j>>::joinable(unsafe { std::mem::transmute(data) })
-            }
         }
 
-        impl<'j, $($from,)*> EncodingSet<'j> for ($($from),*,)
-            where $($from: IterableEncodingDefItem<'j>),*,
-        {
-            type IterItem = ($($from::IterType),*,);
+        // impl<'j, $($from,)*> EncodingSet<'j> for ($($from),*,)
+        //     where
+        //         $($from: IterableEncodingDefItem<'j>),*,
+        //         for<'a> Self: EncodingData<'a>,
+        // {
+        //     type IterItem = ($(Option<$from::IterType>),*,);
+        // }
+
+        impl<'j, $($from: 'j,)*> FetchedData<'j> for ($(Option<$from>),*,) {
+            type Ref = ($(Option<&'j $from>),*,);
         }
 
         impl<'a, $($from,)*> EncodingData<'a> for ($($from),*,)
             where $($from: EncodingDefItem, $from::Fetched: 'a),*,
         {
             type SystemData = ($(ReadStorage<'a, $from::Fetched>),*,);
-        }
-
-        impl<'a: 'j, 'j, $($from,)*> EncodingJoin<'a, 'j> for ($($from),*,)
-            where
-                $($from: JoinedEncodingDefItem<'a, 'j>, <$from as JoinedEncodingDefItem<'a, 'j>>::Storage: 'j),*,
-        {
-            type SystemData = ($($from::Storage),*,);
-            type Joinable = ($($from::Joinable),*,);
+            type FetchedData = ($(Option<$from::Fetched>),*,);
 
             #[allow(non_snake_case)]
-            fn joinable(data: &'j Self::SystemData) -> Self::Joinable {
+            fn get_masks<'j>(data: &'j Self::SystemData) -> VecBitSet<'j> {
                 let (ref $($from),*,) = data;
-                ($($from::get_joinable($from)),*,)
+                let mut vec = vec![];
+                $(
+                    if $from::BOUND {
+                        vec.push($from.mask());
+                    }
+                )*
+                VecBitSet(vec)
+            }
+
+            #[allow(non_snake_case)]
+            fn get_data<'j>(data: &'j Self::SystemData, index: Index) -> <Self::FetchedData as FetchedData<'j>>::Ref {
+                let ($($from),*,) = data;
+                ($(
+                    if $from.mask().contains(index) {
+                        unsafe {
+                            Some($from.unprotected_storage().get(index))
+                        }
+                    } else {
+                        None
+                    }
+                ),*,)
             }
         }
-
-        impl<'a: 'j, 'j, $($from,)*> EncodingStorageJoin<'j> for ($(ReadStorage<'a, $from>),*,)
-            where
-                $($from: Component),*,
-                ($($from),*,): EncodingJoin<'a, 'j, SystemData = Self>,
-        {
-            type Joinable = <($($from),*,) as EncodingJoin<'a, 'j>>::Joinable;
-            fn joinable(data: &'j Self) -> Self::Joinable {
-                <($($from),*,) as EncodingJoin<'a, 'j>>::joinable(data)
-            }
-        }
-
     }
 }
 
