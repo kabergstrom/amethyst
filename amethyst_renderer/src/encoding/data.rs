@@ -1,9 +1,6 @@
-use super::bitset::VecBitSet;
 use amethyst_core::specs::{
-    storage::GenericReadStorage, storage::UnprotectedStorage, world::Index, Component, ReadStorage,
-    SystemData,
+    storage::UnprotectedStorage, world::Index, Component, ReadStorage, SystemData,
 };
-use hibitset::BitSetAll;
 
 /// A read-only access to a component storage. Component types listed in the list of `Encoder`s
 /// on a `StreamEncoder` trait are used for scheduling the encoding for rendering.
@@ -11,21 +8,22 @@ use hibitset::BitSetAll;
 /// Constrained in the same way as `ReadStorage`. You can't use `WriteStorage` with the same inner type at the same time.
 pub struct Encode<A: Component>(std::marker::PhantomData<A>);
 
-/// A read-only joinable composable list of component types.
-// pub trait EncodingSet<'j> {
-//     /// Join representation of encoding set
-//     type IterItem;
-// }
-
+/// A helper trait that allows to retreive the reference type for encoder's components type.
+/// Necessary to avoid tying a specific lifeitme to `EncoderData` trait.
 pub trait FetchedData<'j> {
+    /// The type that adds the expected reference and lifetime to the components tuple
     type Ref;
 }
 
+/// A helper trait that allows retreiving type information and data from storages
+/// related to a defined tuple of encoded components.
 pub trait EncodingData<'a> {
+    /// Tuple of storages for retreiving the components to encode
     type SystemData: SystemData<'a>;
+    /// Type of components tuple used during encoding
     type FetchedData: for<'j> FetchedData<'j>;
 
-    fn get_masks<'j>(data: &'j Self::SystemData) -> VecBitSet<'j>;
+    /// Retreive the set of component references to encode
     fn get_data<'j>(
         data: &'j Self::SystemData,
         index: Index,
@@ -43,15 +41,10 @@ pub trait IterableEncodingDefItem<'j> {
 
 pub trait EncodingDef
 where
-    // for<'j> Self: EncodingSet<'j>,
     for<'a> Self: EncodingData<'a>,
 {
     fn fetch<'a>(res: &'a shred::Resources) -> <Self as EncodingData<'a>>::SystemData {
         SystemData::<'a>::fetch(res)
-    }
-
-    fn get_masks<'a, 'j>(data: &'j <Self as EncodingData<'a>>::SystemData) -> VecBitSet<'j> {
-        <Self as EncodingData<'a>>::get_masks(data)
     }
 
     fn get_data<'a, 'j>(
@@ -76,18 +69,9 @@ macro_rules! impl_encoding_set {
         impl<$($from,)*> EncodingDef for ($($from),*,)
             where
                 $($from: EncodingDefItem),*,
-                // for<'j> Self: EncodingSet<'j>,
                 for<'a> Self: EncodingData<'a>,
         {
         }
-
-        // impl<'j, $($from,)*> EncodingSet<'j> for ($($from),*,)
-        //     where
-        //         $($from: IterableEncodingDefItem<'j>),*,
-        //         for<'a> Self: EncodingData<'a>,
-        // {
-        //     type IterItem = ($(Option<$from::IterType>),*,);
-        // }
 
         impl<'j, $($from: 'j,)*> FetchedData<'j> for ($(Option<$from>),*,) {
             type Ref = ($(Option<&'j $from>),*,);
@@ -98,18 +82,6 @@ macro_rules! impl_encoding_set {
         {
             type SystemData = ($(ReadStorage<'a, $from::Fetched>),*,);
             type FetchedData = ($(Option<$from::Fetched>),*,);
-
-            #[allow(non_snake_case)]
-            fn get_masks<'j>(data: &'j Self::SystemData) -> VecBitSet<'j> {
-                let (ref $($from),*,) = data;
-                let mut vec = vec![];
-                $(
-                    if $from::BOUND {
-                        vec.push($from.mask());
-                    }
-                )*
-                VecBitSet(vec)
-            }
 
             #[allow(non_snake_case)]
             fn get_data<'j>(data: &'j Self::SystemData, index: Index) -> <Self::FetchedData as FetchedData<'j>>::Ref {

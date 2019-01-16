@@ -9,9 +9,10 @@ use amethyst_assets::AssetStorage;
 use amethyst_core::{nalgebra::Vector4, specs::Read, GlobalTransform};
 
 /// An encoder that encodes `Rgba` component into a stream of `vec4 tint`.
+#[allow(dead_code)]
 pub struct RgbaTintEncoder;
 impl<'a> LoopingStreamEncoder<'a> for RgbaTintEncoder {
-    type Properties = TintProperty;
+    type Properties = (TintProperty,);
     type Components = (Encode<Rgba>,);
     type SystemData = ();
 
@@ -21,13 +22,14 @@ impl<'a> LoopingStreamEncoder<'a> for RgbaTintEncoder {
     ) -> LoopResult {
         encode_loop.run(|(rgba,)| {
             let rgba = rgba.unwrap_or(&Rgba::WHITE);
-            Some([rgba.0, rgba.1, rgba.2, rgba.3])
+            (Some([rgba.0, rgba.1, rgba.2, rgba.3]),)
         })
     }
 }
 
 /// An encoder that encodes `GlobalTransform` and `RenderSpriteFlat2D` components
 /// into streams of `vec4 pos`, `vec4 dir_x` and `vec4 dir_y`.
+#[allow(dead_code)]
 pub struct SpriteTransformEncoder;
 impl<'a> LoopingStreamEncoder<'a> for SpriteTransformEncoder {
     type Properties = (Pos2DProperty, DirXProperty, DirYProperty);

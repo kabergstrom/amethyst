@@ -1,12 +1,11 @@
 use super::{
-    bitset::VecBitSet, data::EncodingDef, properties::EncodingValue, EncProperties, EncodeBuffer,
+    data::EncodingDef, properties::EncodingValue, EncProperties, EncodeBuffer, EncodeBufferBuilder,
     EncodedProp, EncodingData, FetchedData,
 };
 use amethyst_core::specs::SystemData;
-use core::any::Any;
-use core::marker::PhantomData;
 use hibitset::BitSet;
 use shred::Resources;
+use std::{any::Any, marker::PhantomData};
 
 /// A main trait that defines a strategy to encode specified stream of properties
 /// by iteration over declared set of components in the world. The encoder might also
@@ -14,18 +13,25 @@ use shred::Resources;
 ///
 /// Every encoder must push exactly one value per iterated entity to the buffer.
 pub trait StreamEncoder<'a> {
+    /// List of shader properties that this encoder encodes
     type Properties: EncProperties;
-    type Components: EncodingDef;
-    type SystemData: SystemData<'a>;
 
-    fn get_props() -> Vec<EncodedProp> {
+    /// Get a runtime list of shader properties encoded by this encoder
+    fn get_props() -> <Self::Properties as EncProperties>::PropsIter {
         Self::Properties::get_props()
     }
 
-    fn encode<'j>(
-        buffer: &mut impl EncodeBuffer<EncType<'a, Self>>,
-        iter: impl Iterator<Item = IterItem<'a, 'j, Self>>,
-        system_data: DataType<'a, Self>,
+    /// Do the encoding, filling the provided buffer with encoded data.
+    ///
+    /// Unsafe because caller must guarantee that the bitset count
+    /// matches the buffer length.
+    ///
+    /// Implementer must ensure that for every bitset entry,
+    /// there is exactly one `buffer.push` call.
+    unsafe fn encode<B: EncodeBuffer<EncType<'a, Self>>>(
+        bitset: &BitSet,
+        res: &'a Resources,
+        buffer: B,
     );
 }
 
@@ -44,7 +50,7 @@ where
         ) -> <O::EncodedType as EncodingValue>::OptValue;
 }
 
-pub struct EncodeLoopImpl<'a, I, O, B>
+pub struct EncodeLoopImpl<'a, 'b, I, O, B>
 where
     I: EncodingDef + 'a,
     O: EncProperties,
@@ -52,45 +58,41 @@ where
 {
     marker: PhantomData<(I, O)>,
     bitset: &'a BitSet,
-    res: &'a Resources,
-    buffer: &'a mut B,
+    input_data: <I as EncodingData<'b>>::SystemData,
+    buffer: B,
 }
 
-impl<'a, I, O, B> EncodeLoopImpl<'a, I, O, B>
+impl<'a, 'b, I, O, B> EncodeLoopImpl<'a, 'b, I, O, B>
 where
-    I: EncodingDef + 'a,
+    I: EncodingDef,
     O: EncProperties,
     B: EncodeBuffer<O::EncodedType>,
 {
-    fn new(bitset: &'a BitSet, res: &'a Resources, buffer: &'a mut B) -> Self {
+    fn new(bitset: &'a BitSet, input_data: <I as EncodingData<'b>>::SystemData, buffer: B) -> Self {
         Self {
             marker: PhantomData,
             bitset,
-            res,
+            input_data,
             buffer,
         }
     }
 }
 
-impl<'x, I, O, B> EncodeLoop<I, O> for EncodeLoopImpl<'x, I, O, B>
+impl<I, O, B> EncodeLoop<I, O> for EncodeLoopImpl<'_, '_, I, O, B>
 where
-    I: EncodingDef + 'x,
+    I: EncodingDef,
     O: EncProperties,
     B: EncodeBuffer<O::EncodedType>,
 {
-    fn run<F>(self, mapper: F) -> LoopResult
+    fn run<F>(mut self, mapper: F) -> LoopResult
     where
         for<'a, 'j> F: Fn(
             <<I as EncodingData<'a>>::FetchedData as FetchedData<'j>>::Ref,
         ) -> <O::EncodedType as EncodingValue>::OptValue,
     {
-        let data = I::fetch(self.res);
-
         for idx in self.bitset {
-            let components = <I as EncodingDef>::get_data(&data, idx);
-            let encoded = mapper(components);
-            let resolved = O::resolve(encoded);
-            self.buffer.push(resolved);
+            let components = <I as EncodingDef>::get_data(&self.input_data, idx);
+            self.buffer.push(O::resolve(mapper(components)));
         }
 
         LoopResult(())
@@ -110,32 +112,21 @@ pub trait LoopingStreamEncoder<'a> {
 
 impl<'a, T: LoopingStreamEncoder<'a>> StreamEncoder<'a> for T {
     type Properties = T::Properties;
-    type Components = T::Components;
-    type SystemData = T::SystemData;
 
-    fn encode<'j>(
-        buffer: &mut impl EncodeBuffer<EncType<'a, Self>>,
-        iter: impl Iterator<Item = IterItem<'a, 'j, Self>>,
-        system_data: DataType<'a, Self>,
+    unsafe fn encode<B: EncodeBuffer<EncType<'a, Self>>>(
+        bitset: &BitSet,
+        res: &'a Resources,
+        buffer: B,
     ) {
-        // let looping = EncodeLoopImpl::new();
+        let (input_data, system_data) = SystemData::fetch(res);
+        let encode_loop =
+            EncodeLoopImpl::<T::Components, T::Properties, B>::new(bitset, input_data, buffer);
+        T::encode(encode_loop, system_data);
     }
 }
 
+/// A type used as an encoder output
 pub type EncType<'a, T> = <<T as StreamEncoder<'a>>::Properties as EncProperties>::EncodedType;
-pub type IterItem<'a, 'j, T> = <<<T as StreamEncoder<'a>>::Components as EncodingData<'a>>::FetchedData as FetchedData<'j>>::Ref;
-pub type DataType<'a, T> = <T as StreamEncoder<'a>>::SystemData;
-
-// fn encoder_encode<'a: 'j, 'j, T>(
-//     buffer: &mut impl EncodeBuffer<EncType<'a, 'j, T>>,
-//     iter: impl Iterator<Item = IterItem<'a, 'j, T>>,
-//     system_data: DataType<'a, 'j, T>,
-// ) where
-//     T: StreamEncoder<'a>,
-//     <T as StreamEncoder<'a>>::Components: EncodingSet<'j>,
-// {
-//     T::encode(buffer, iter, system_data)
-// }
 
 struct AnyEncoderImpl<T> {
     _marker: std::marker::PhantomData<T>,
@@ -144,20 +135,31 @@ struct AnyEncoderImpl<T> {
 unsafe impl<T: for<'a> StreamEncoder<'a>> Send for AnyEncoderImpl<T> {}
 unsafe impl<T: for<'a> StreamEncoder<'a>> Sync for AnyEncoderImpl<T> {}
 
+/// Dynamic type that can hold any encoder
 pub trait AnyEncoder: Any + Send + Sync {
+    /// Get a runtime list of shader properties encoded by this encoder
     fn get_props(&self) -> Vec<EncodedProp>;
-    fn get_masks<'a>(&self, res: &'a Resources) -> VecBitSet<'a>;
+
+    /// Run encoding operation of type-erased encoder
+    unsafe fn encode<'b>(
+        &self,
+        bitset: &BitSet,
+        res: &Resources,
+        buffer_builder: EncodeBufferBuilder<'b>,
+    );
 }
 
 impl<T: for<'a> StreamEncoder<'a> + 'static> AnyEncoder for AnyEncoderImpl<T> {
     fn get_props(&self) -> Vec<EncodedProp> {
-        T::get_props()
+        T::get_props().collect()
     }
-
-    fn get_masks<'a>(&self, res: &'a Resources) -> VecBitSet<'a> {
-        let data = T::Components::fetch(res);
-        // T::Components::get_masks(&data)
-        unimplemented!();
+    unsafe fn encode<'b>(
+        &self,
+        bitset: &BitSet,
+        res: &Resources,
+        buffer_builder: EncodeBufferBuilder<'b>,
+    ) {
+        T::encode(bitset, res, buffer_builder.build());
     }
 }
 

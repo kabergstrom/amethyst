@@ -3,6 +3,7 @@ use crate::SpriteRender;
 use amethyst_core::specs::{SystemData, World};
 use amethyst_core::GlobalTransform;
 use hibitset::BitSet;
+use criterion;
 
 pub struct HandleFake {
     id: std::sync::Arc<u32>,
@@ -45,7 +46,7 @@ fn mock_world() -> World {
             sprite_sheet: HandleFake::new(0),
             sprite_number: 0,
         })
-        .with(Rgba::WHITE)
+        .with(Rgba::BLUE)
         .build();
 
     world
