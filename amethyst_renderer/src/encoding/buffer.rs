@@ -1,5 +1,9 @@
-use super::properties::{EncodedProp, EncodingValue, IterableEncoding};
-use std::marker::PhantomData;
+use super::{EncodingLayout, EncodingValue, IterableEncoding};
+use crate::encoding::properties::EncProperties;
+use std::{
+    cell::{RefCell, RefMut},
+    marker::PhantomData,
+};
 
 /// Trait that defines the encoding buffer writing stragety for a specified
 /// shader layout.
@@ -25,29 +29,34 @@ struct BinBufferStride<'a> {
 impl<'a> BinBufferStride<'a> {
     #[allow(dead_code)]
     /// TODO docs
-    pub fn from_layout<'s>(
+    pub fn from_layout<'l>(
         slice: &'a mut [u8],
-        layout: &EncodingLayout,
-    ) -> impl Iterator<Item = BinBufferStride<'a>> + 's {
-        let stride: usize = sizes.iter().sum();
+        layout: &'l EncodingLayout,
+    ) -> impl Iterator<Item = BinBufferStride<'a>> + 'l {
+        let stride: usize = layout.padded_size as usize;
 
-        assert!(stride > 0 && slice.len() % stride == 0);
+        assert!(
+            stride > 0 && slice.len() % stride == 0,
+            "Buffer size {} must be a multiple of layout stride {}",
+            slice.len(),
+            stride
+        );
 
         let elem_count = slice.len() / stride;
         let mut_ptr = slice.as_mut_ptr();
 
-        let mut start_offset: isize = 0;
-        sizes.iter().map(move |size| {
-            let begin = unsafe { mut_ptr.offset(start_offset) };
-            let stride_struct = BinBufferStride {
+        // Let's assume that layout is well-formed and has no overlaps
+        layout.props.iter().map(move |layout_prop| {
+            let begin = unsafe { mut_ptr.offset(layout_prop.absolute_offset as isize) };
+            let size = layout_prop.ubo_size();
+
+            BinBufferStride {
                 begin,
                 stride: stride as isize,
                 elem_count: elem_count as isize,
-                contiguous_count: *size,
+                contiguous_count: size,
                 life: PhantomData,
-            };
-            start_offset += *size as isize;
-            stride_struct
+            }
         })
     }
 
@@ -60,16 +69,16 @@ impl<'a> BinBufferStride<'a> {
     }
 }
 
-pub struct StridedEncodeBuffer<'a, T: EncodingValue> {
-    strides: &'a mut [BinBufferStride<'a>],
+pub struct BufferWriter<'a, 'b, T: EncodingValue> {
+    strides: Vec<RefMut<'b, BinBufferStride<'a>>>,
     write_idx: usize,
     marker: PhantomData<T>,
 }
 
-impl<'a, T: EncodingValue> StridedEncodeBuffer<'a, T> {
+impl<'a, 'b, T: EncodingValue> BufferWriter<'a, 'b, T> {
     /// TODO docs
     #[allow(dead_code)]
-    fn new(strides: &'a mut [BinBufferStride<'a>]) -> Self {
+    fn new(strides: Vec<RefMut<'b, BinBufferStride<'a>>>) -> Self {
         Self {
             strides,
             write_idx: 0,
@@ -78,7 +87,7 @@ impl<'a, T: EncodingValue> StridedEncodeBuffer<'a, T> {
     }
 }
 
-impl<'a, T: EncodingValue> EncodeBuffer<T> for StridedEncodeBuffer<'a, T> {
+impl<'a, 'b, T: EncodingValue> EncodeBuffer<T> for BufferWriter<'a, 'b, T> {
     fn push(&mut self, data: T::Value) {
         data.for_each(|idx, bytes| {
             let dst = self.strides[idx].get_mut(self.write_idx);
@@ -88,24 +97,46 @@ impl<'a, T: EncodingValue> EncodeBuffer<T> for StridedEncodeBuffer<'a, T> {
     }
 }
 
-/// TODO docs
-pub struct EncodeBufferBuilder<'b> {
-    _stride: BinBufferStride<'b>,
+/// A builder for `BufferWriter`. Does the job of figuring out which strides should be written into in what order.
+pub struct EncodeBufferBuilder<'a> {
+    layout: EncodingLayout,
+    strides: Vec<RefCell<BinBufferStride<'a>>>,
 }
 
-impl<'b> EncodeBufferBuilder<'b> {
-    /// TODO docs
-    pub fn create(_layout: &Vec<EncodedProp>, _raw_buffer: &mut [u8]) -> Self {
-        unimplemented!()
+impl<'a> EncodeBufferBuilder<'a> {
+    /// Create a `BufferWriteBuilder` with specific shader layout
+    /// and buffer that's going to be written during encoding.
+    pub fn create(layout: &EncodingLayout, raw_buffer: &'a mut [u8]) -> Self {
+        Self {
+            strides: BinBufferStride::from_layout(raw_buffer, layout)
+                .map(RefCell::new)
+                .collect(),
+            layout: layout.clone(),
+        }
     }
 
-    /// TODO docs
-    pub fn build<T: EncodingValue>(self) -> StridedEncodeBuffer<'b, T> {
-        // StridedEncodeBuffer::new(self.stride)
-        unimplemented!()
+    /// Build a `BufferWriter` tailored for encoding of specific type.
+    ///
+    /// Works under an assumption that there is only one property of given name in a shader layout.
+    pub fn build<'b, T: EncProperties>(&'b self) -> BufferWriter<'a, 'b, T::EncodedType> {
+        let props_in_encoding_order = T::get_props();
+        let stride_indices = props_in_encoding_order.map(|prop| {
+            self.layout
+                .props
+                .iter()
+                .position(|layout_prop| layout_prop.prop == prop)
+                .expect("Trying to encode a prop that is not a part of provided layout")
+        });
+
+        let strides = stride_indices
+            .map(|i| {
+                self.strides[i]
+                    .try_borrow_mut()
+                    .ok()
+                    .expect("Tries to encode the same data type multiple times")
+            })
+            .collect::<Vec<_>>();
+
+        BufferWriter::new(strides)
     }
 }
-
-// TODO: create buffer tree by sequential builders invocation
-// create top-level builder with layout
-// Use Rc<&[u8]> internally to push to

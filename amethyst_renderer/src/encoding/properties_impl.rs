@@ -1,4 +1,4 @@
-use super::properties::{EncProperty, EncVec4};
+use super::{EncProperty, EncVec4};
 
 /// Shader attribute `vec4 tint`
 pub struct TintProperty;

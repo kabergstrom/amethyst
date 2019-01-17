@@ -2,22 +2,6 @@
 // use amethyst_assets::Handle;
 use std::iter::{once, Chain, Once};
 
-pub struct EncodingLayout {
-    props: Vec<LayoutProp>,
-    padded_size: u32,
-}
-
-pub struct LayoutProp {
-    prop: EncodedProp,
-    absolute_offset: u32,
-}
-
-impl LayoutProp {
-    fn ubo_size(&self) -> usize {
-        self.prop.0.ubo_size()
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Debug, Clone, Copy)]
 pub enum InputKind {
     Uniform,
@@ -125,6 +109,7 @@ macro_rules! define_shader_inputs {
         }
 
         $(
+            $(#[$meta])*
             pub struct $typename;
             impl ShaderInputType for $typename {
                 const TY: ShaderInput = ShaderInput::$variant;
@@ -168,9 +153,12 @@ define_shader_inputs! {
 /// Combined type that maps a shader attribute layout (a tuple of `ShaderInputType`s)
 /// into the corresponding output of an encoder.
 pub trait EncodingValue {
+    /// A value that is the result of an encoding. Any encoder output must eventually
+    /// be resolved to that type at some stage.
     type Value: IterableEncoding;
+    /// Optional version of the encoding value. This is what encoders actually pass to the `BufferWriter`.
     type OptValue;
-    // type Resolved: ResolvedEncoding;
+    /// Resolve the optional value into a valid encoding output, using fallback values where needed.
     fn resolve(optional: Self::OptValue, fallback: Self::Value) -> Self::Value;
 }
 
@@ -199,6 +187,11 @@ pub trait EncProperty {
     /// Get all runtime shader properties for this type of encodable attribute
     fn prop() -> EncodedProp {
         (Self::EncodedType::TY, Self::PROPERTY)
+    }
+
+    /// Retreive the size in bytes of underlying property representation.
+    fn size() -> usize {
+        std::mem::size_of::<<Self::EncodedType as EncodingValue>::Value>()
     }
 
     /// Retreive fallback value for missing encoded output

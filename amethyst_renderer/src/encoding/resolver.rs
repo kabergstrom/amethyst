@@ -1,16 +1,18 @@
-use super::{EncoderPipeline, Shader};
-use amethyst_assets::{Handle, Loader};
-use amethyst_core::specs::{storage::UnprotectedStorage, Component, VecStorage, Write};
+use super::{EncodingLayout, Shader};
+use amethyst_assets::{AssetStorage, Handle, Loader, Processor};
+use amethyst_core::specs::{
+    storage::UnprotectedStorage, Component, RunNow, SystemData, VecStorage, Write,
+};
 use hibitset::BitSet;
 use shred::Resources;
 
 /// Ability to resolve pipeline based on a component. Used in the first phase of world encoding.
-pub trait PipelineResolver<T: Component> {
+pub trait LayoutResolver<T: Component> {
     /// Resolve a pipeline from the world based on a component information
-    fn resolve(&self, res: &Resources, component: &T) -> Option<Handle<EncoderPipeline>>;
+    fn resolve(&self, res: &Resources, component: &T) -> Option<Handle<EncodingLayout>>;
 }
 
-/// A simplified version of PipelineResolver. Provides a way to specify the resolution
+/// A simplified version of LayoutResolver. Provides a way to specify the resolution
 /// by just extracting the shader handle from a component.
 /// Usually used in it's closure form `Fn(&T) -> Handle<Shader>`.
 ///
@@ -21,24 +23,24 @@ pub trait ShaderResolver<T: Component> {
     fn resolve(&self, res: &Resources, component: &T) -> Handle<Shader>;
 }
 
-impl<T: Component, R: ShaderResolver<T>> PipelineResolver<T> for R {
-    fn resolve(&self, res: &Resources, component: &T) -> Option<Handle<EncoderPipeline>> {
+impl<T: Component, R: ShaderResolver<T>> LayoutResolver<T> for R {
+    fn resolve(&self, res: &Resources, component: &T) -> Option<Handle<EncodingLayout>> {
         let shader_handle = ShaderResolver::resolve(self, res, component);
-        res.fetch_mut::<Write<'_, PipelineResolveCache>>()
-            .resolve(res, shader_handle)
+        <Write<'_, LayoutResolveCache>>::fetch(res).resolve(res, shader_handle)
     }
 }
 
 type HandleVersion = usize;
 
+/// A resource used to cache resolved layounts based on shader handles.
 #[derive(Default)]
-struct PipelineResolveCache(BitSet, VecStorage<(HandleVersion, Handle<EncoderPipeline>)>);
-impl PipelineResolveCache {
+pub struct LayoutResolveCache(BitSet, VecStorage<(HandleVersion, Handle<EncodingLayout>)>);
+impl LayoutResolveCache {
     fn resolve(
         &mut self,
         res: &Resources,
         shader_handle: Handle<Shader>,
-    ) -> Option<Handle<EncoderPipeline>> {
+    ) -> Option<Handle<EncodingLayout>> {
         let id = shader_handle.id();
         let shader_version: HandleVersion = 0; // TODO: read real version once hot-reloading is done
 
@@ -52,9 +54,16 @@ impl PipelineResolveCache {
             }
         }
 
-        EncoderPipeline::from_shader(res, &shader_handle).map(|pipeline| {
-            let loader = res.fetch_mut::<Loader>();
-            let handle = loader.load_from_data(pipeline, (), &res.fetch());
+        let storage = res.fetch::<AssetStorage<Shader>>();
+        let maybe_shader = storage.get(&shader_handle);
+        maybe_shader.map(|shader| {
+            let layout = EncodingLayout::from_shader(&shader);
+            let loader = res.fetch::<Loader>();
+            let handle = loader.load_from_data(layout, (), &res.fetch());
+
+            // TODO: This processing should be completely avoided. For that, we need
+            // a better way to define computed assets.
+            <Processor<EncodingLayout>>::new().run_now(&res);
 
             unsafe { self.1.insert(id, (shader_version, handle.clone())) };
             self.0.add(id);

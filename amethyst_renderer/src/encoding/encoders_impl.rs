@@ -16,8 +16,8 @@ impl<'a> LoopingStreamEncoder<'a> for RgbaTintEncoder {
     type Components = (Encode<Rgba>,);
     type SystemData = ();
 
-    fn encode(
-        encode_loop: impl EncodeLoop<Self::Components, Self::Properties>,
+    fn encode<'j>(
+        encode_loop: impl EncodeLoop<'a, 'j, Self::Components, Self::Properties>,
         _: Self::SystemData,
     ) -> LoopResult {
         encode_loop.run(|(rgba,)| {
@@ -35,8 +35,8 @@ impl<'a> LoopingStreamEncoder<'a> for SpriteTransformEncoder {
     type Properties = (Pos2DProperty, DirXProperty, DirYProperty);
     type Components = (Encode<GlobalTransform>, Encode<SpriteRender>);
     type SystemData = (Read<'a, AssetStorage<SpriteSheet>>);
-    fn encode(
-        encode_loop: impl EncodeLoop<Self::Components, Self::Properties>,
+    fn encode<'j>(
+        encode_loop: impl EncodeLoop<'a, 'j, Self::Components, Self::Properties>,
         spritesheet_storage: Self::SystemData,
     ) -> LoopResult {
         encode_loop.run(|(transform, sprite_render)| {

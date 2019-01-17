@@ -14,11 +14,12 @@ mod test;
 pub use self::{
     buffer::{EncodeBuffer, EncodeBufferBuilder},
     data::{Encode, EncodingData, FetchedData},
-    pipeline::{EncoderPipeline, Shader},
+    pipeline::{EncoderPipeline, EncodingLayout, Shader},
     properties::{
-        EncProperties, EncProperty, EncodedProp, IterableEncoding, ShaderInput, ShaderInputType,
+        EncProperties, EncProperty, EncVec4, EncodedProp, EncodingValue, IterableEncoding,
+        ShaderInput, ShaderInputType,
     },
-    query::EncodingQuery,
-    resolver::{PipelineResolver, ShaderResolver},
+    query::{EncoderStorage, EncoderStorageBuilder, EncodingQuery, EvaluatedQuery},
+    resolver::{LayoutResolveCache, LayoutResolver, ShaderResolver},
     stream_encoder::{AnyEncoder, EncType, StreamEncoder},
 };
