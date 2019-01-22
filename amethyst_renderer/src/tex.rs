@@ -1,16 +1,14 @@
 //! Texture resource.
 
+use error_chain::bail;
 pub use gfx::{
     format::{ChannelType, SurfaceType},
-    texture::{FilterMethod, SamplerInfo, WrapMode},
-};
-
-use std::marker::PhantomData;
-
-use gfx::{
-    texture::{Info, Mipmap},
+    texture::{FilterMethod, Info, Mipmap, SamplerInfo, WrapMode},
     traits::Pod,
 };
+use serde::{Deserialize, Serialize};
+
+use std::marker::PhantomData;
 
 use amethyst_assets::{Asset, Handle};
 use amethyst_core::specs::prelude::DenseVecStorage;
@@ -203,8 +201,8 @@ where
         let desc = ResourceDesc {
             channel: self.channel_type,
             layer: None,
-            min: 1,
-            max: self.info.levels,
+            min: 0,
+            max: self.info.levels - 1,
             swizzle: Swizzle::new(),
         };
 

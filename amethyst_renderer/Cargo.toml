@@ -8,7 +8,7 @@ exclude = ["examples/*"]
 keywords = ["game", "engine", "renderer", "3d", "amethyst"]
 categories = ["rendering", "rendering::engine"]
 
-documentation = "https://www.amethyst.rs/doc/master/doc/amethyst_renderer/"
+documentation = "https://www.amethyst.rs/doc/latest/doc/amethyst_renderer/"
 homepage = "https://www.amethyst.rs/"
 repository = "https://github.com/amethyst/amethyst"
 
@@ -42,10 +42,10 @@ gfx_macros = "0.2"
 glsl-layout = { version = "0.1.1", features = ["gfx"] }
 hibitset = { version = "0.5.1", features = ["parallel"] }
 image = "0.20"
-log = "0.4"
+log = "0.4.6"
 rayon = "1.0.2"
 ron = "0.4"
-serde = { version = "1", features = ["serde_derive"] }
+serde = { version = "1", features = ["derive"] }
 shred-derive = "0.5"
 shred = "0.7"
 wavefront_obj = "5.1"

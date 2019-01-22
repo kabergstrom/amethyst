@@ -12,7 +12,7 @@ license = "MIT/Apache-2.0"
 keywords = ["game", "asset", "resource", "management", "amethyst"]
 categories = ["filesystem"]
 
-documentation = "https://www.amethyst.rs/doc/master/doc/amethyst/"
+documentation = "https://www.amethyst.rs/doc/latest/doc/amethyst/"
 homepage = "https://www.amethyst.rs/"
 repository = "https://github.com/amethyst/amethyst"
 
@@ -27,10 +27,10 @@ derivative = "1.0"
 error-chain = "0.12"
 fnv = "1"
 hibitset = { version = "0.5.1", features = ["parallel"] }
-log = "0.4"
+log = "0.4.6"
 parking_lot = "0.6"
 rayon = "1.0.2"
-serde = { version = "1", features = ["serde_derive"] }
+serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", optional = true }
 shred = { version = "0.7" }
 shred-derive = { version = "0.5" }

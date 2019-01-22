@@ -4,6 +4,7 @@
 
 pub use self::pso::{Data, Init, Meta};
 
+use derivative::Derivative;
 use fnv::FnvHashMap as HashMap;
 use gfx::{
     buffer::{Info as BufferInfo, Role as BufferRole},
@@ -17,6 +18,8 @@ use gfx::{
     Primitive, ShaderSet,
 };
 use glsl_layout::Std140;
+use log::{debug, warn};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     error::{Error, Result},
@@ -42,8 +45,7 @@ pub(crate) enum ProgramSource<'a> {
 
 impl<'a> ProgramSource<'a> {
     pub fn compile(&self, fac: &mut Factory) -> Result<ShaderSet<Resources>> {
-        use gfx::traits::FactoryExt;
-        use gfx::Factory;
+        use gfx::{traits::FactoryExt, Factory};
 
         match *self {
             ProgramSource::Simple(ref vs, ref ps) => fac
@@ -326,8 +328,7 @@ impl<'a> EffectBuilder<'a> {
 
     /// TODO: Support render targets as inputs.
     pub fn build(&mut self) -> Result<Effect> {
-        use gfx::traits::FactoryExt;
-        use gfx::Factory;
+        use gfx::{traits::FactoryExt, Factory};
 
         debug!("Building effect");
         debug!("Compiling shaders");

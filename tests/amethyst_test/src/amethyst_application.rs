@@ -1,8 +1,4 @@
-use std::hash::Hash;
-use std::marker::PhantomData;
-use std::path::PathBuf;
-use std::sync::Mutex;
-use std::thread;
+use std::{hash::Hash, marker::PhantomData, path::PathBuf, sync::Mutex, thread};
 
 use amethyst::{
     self,
@@ -21,7 +17,9 @@ use amethyst::{
     Result, StateEventReader,
 };
 use boxfnonce::SendBoxFnOnce;
+use derivative::Derivative;
 use hetseq::Queue;
+use lazy_static::lazy_static;
 
 use crate::{
     CustomDispatcherStateBuilder, FunctionState, GameUpdate, SequencerState, SystemInjectionBundle,
@@ -669,10 +667,6 @@ mod test {
 
     use super::AmethystApplication;
     use crate::{EffectReturn, FunctionState, PopState};
-    #[cfg(feature = "graphics")]
-    use MaterialAnimationFixture;
-    #[cfg(feature = "graphics")]
-    use SpriteRenderAnimationFixture;
 
     #[test]
     fn bundle_build_is_ok() {

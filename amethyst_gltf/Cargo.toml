@@ -5,7 +5,7 @@ authors = ["Rhuagh <seamonr@gmail.com>"]
 edition = "2018"
 description = "GLTF asset loading"
 
-documentation = "https://www.amethyst.rs/doc/master/doc/amethyst_gltf/"
+documentation = "https://www.amethyst.rs/doc/latest/doc/amethyst_gltf/"
 homepage = "https://www.amethyst.rs/"
 repository = "https://github.com/amethyst/amethyst"
 
@@ -26,7 +26,7 @@ gltf = "0.11"
 gfx = "0.17"
 hibitset = { version = "0.5.1", features = ["parallel"] }
 itertools = "0.7"
-log = "0.4"
+log = "0.4.6"
 mikktspace = { version = "0.1" }
 serde = { version = "1.0", features = ["derive"] }
 

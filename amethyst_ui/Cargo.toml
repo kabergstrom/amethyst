@@ -7,7 +7,7 @@ description = "Amethyst UI crate"
 keywords = ["ui", "specs", "ecs", "amethyst"]
 categories = ["game-engines"]
 
-documentation = "https://www.amethyst.rs/doc/master/doc/amethyst_ui/"
+documentation = "https://www.amethyst.rs/doc/latest/doc/amethyst_ui/"
 homepage = "https://www.amethyst.rs/"
 repository = "https://github.com/amethyst/amethyst"
 license = "MIT/Apache-2.0"
@@ -20,6 +20,7 @@ amethyst_renderer = { path = "../amethyst_renderer", version = "0.10.0" }
 amethyst_input = { path = "../amethyst_input", version = "0.6.0" }
 clipboard = "0.5"
 derivative = "1.0"
+derive-new = "0.5.6"
 fnv = "1"
 gfx = { version = "0.17", features = ["serialize"] }
 gfx_glyph = "0.13.0"
@@ -29,10 +30,11 @@ ron = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 shred-derive = "0.5"
 shred = "0.7"
+smallvec = "0.6"
 unicode-normalization = "0.1"
 unicode-segmentation = "1.2"
 winit = { version = "0.18", features = ["serde"] }
-log = "0.4"
+log = "0.4.6"
 font-kit = "0.1"
 
 thread_profiler = { version = "0.3", optional = true }

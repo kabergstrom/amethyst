@@ -1,7 +1,11 @@
 use std::marker::PhantomData;
 
-use amethyst::core::bundle::{Result, SystemBundle};
-use amethyst::ecs::prelude::*;
+use amethyst::{
+    core::bundle::{Result, SystemBundle},
+    ecs::prelude::*,
+};
+
+use derive_new::new;
 
 /// Adds a specified `System` to the dispatcher.
 #[derive(Debug, new)]

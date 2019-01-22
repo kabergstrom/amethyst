@@ -2,13 +2,12 @@
 
 use std::{
     error::Error as StdError,
-    fmt::Result as FmtResult,
-    fmt::{Display, Formatter},
+    fmt::{Display, Formatter, Result as FmtResult},
     io,
     result::Result as StdResult,
 };
 
-use crate::{config::ConfigError, core, renderer, state::StateError};
+use crate::{config::ConfigError, core, input::BindingsFileError, renderer, state::StateError};
 
 /// Engine result type.
 pub type Result<T> = StdResult<T, Error>;
@@ -82,5 +81,20 @@ impl From<ConfigError> for Error {
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Error::Io(e)
+    }
+}
+
+impl<AX, AC> From<BindingsFileError<AX, AC>> for Error
+where
+    AX: Display,
+    AC: Display,
+{
+    fn from(e: BindingsFileError<AX, AC>) -> Self {
+        match e {
+            BindingsFileError::ConfigError(err) => Error::Config(err),
+            BindingsFileError::BindingError(err) => Error::Core(core::Error::from_kind(
+                core::ErrorKind::Msg(err.to_string()),
+            )),
+        }
     }
 }

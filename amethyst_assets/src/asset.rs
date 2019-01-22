@@ -3,6 +3,9 @@ use ::uuid;
 
 use amethyst_core::specs::storage::UnprotectedStorage;
 
+#[cfg(feature = "profiler")]
+use thread_profiler::profile_scope;
+
 use crate::{ErrorKind, Handle, Reload, Result, ResultExt, SingleFile, Source};
 
 

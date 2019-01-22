@@ -8,13 +8,17 @@ use amethyst_core::{
     nalgebra::{Vector2, Vector3},
     specs::prelude::{Component, Entity, Read, ReadExpect, VecStorage, WriteStorage},
 };
+
+use serde::{Serialize, Deserialize};
+use serde_dyn::{uuid};
+use wavefront_obj::obj::{
+    parse, Normal, NormalIndex, ObjSet, Object, Primitive, TVertex, TextureIndex, Vertex,
+    VertexIndex,
+};
+
 use crate::{
     mesh::{Mesh, MeshBuilder, MeshHandle},
     vertex::*,
-    wavefront_obj::obj::{
-        parse, Normal, NormalIndex, ObjSet, Object, Primitive, TVertex, TextureIndex, Vertex,
-        VertexIndex,
-    },
     Renderer,
 };
 

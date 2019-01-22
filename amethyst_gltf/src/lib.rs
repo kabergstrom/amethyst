@@ -2,27 +2,17 @@
 
 #![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
+use serde::{Deserialize, Serialize};
+
+pub use crate::format::GltfSceneFormat;
+
+use std::{collections::HashMap, ops::Range};
+
 use amethyst_animation as animation;
 use amethyst_assets as assets;
 use amethyst_core as core;
 use amethyst_renderer as renderer;
-use base64;
 
-use gltf;
-
-#[macro_use]
-extern crate log;
-use mikktspace;
-#[macro_use]
-extern crate serde;
-
-#[macro_use]
-#[cfg(feature = "profiler")]
-extern crate thread_profiler;
-
-use std::{collections::HashMap, ops::Range};
-
-pub use crate::format::GltfSceneFormat;
 use crate::{
     animation::{AnimatablePrefab, SkinnablePrefab},
     assets::{Handle, Prefab, PrefabData, PrefabLoaderSystem, ProgressCounter},
