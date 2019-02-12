@@ -1,21 +1,19 @@
 //! Rendering system.
 //!
 
-use std::{mem, sync::Arc};
+use std::{mem};
 
 use derivative::Derivative;
 use log::error;
-use rayon::ThreadPool;
 use winit::{DeviceEvent, Event, WindowEvent};
 
 #[cfg(feature = "profiler")]
 use thread_profiler::profile_scope;
 
-use amethyst_assets::{AssetStorage, HotReloadStrategy};
+use amethyst_assets::{AssetStorage};
 use amethyst_core::{
     shrev::EventChannel,
-    specs::prelude::{Read, ReadExpect, Resources, RunNow, SystemData, Write, WriteExpect},
-    Time,
+    specs::prelude::{Resources, RunNow, SystemData, Write, WriteExpect},
 };
 
 use crate::{
@@ -94,24 +92,14 @@ where
 
     fn asset_loading(
         &mut self,
-        (time, pool, strategy, mut mesh_storage, mut texture_storage): AssetLoadingData<'_>,
+        (mut mesh_storage, mut texture_storage): AssetLoadingData<'_>,
     ) {
-        use std::ops::Deref;
-
-        let strategy = strategy.as_ref().map(Deref::deref);
-
         mesh_storage.process(
             |d| create_mesh_asset(d, &mut self.renderer),
-            time.frame_number(),
-            &**pool,
-            strategy,
         );
 
         texture_storage.process(
             |d| create_texture_asset(d, &mut self.renderer),
-            time.frame_number(),
-            &**pool,
-            strategy,
         );
     }
 
@@ -160,9 +148,6 @@ where
 }
 
 type AssetLoadingData<'a> = (
-    Read<'a, Time>,
-    ReadExpect<'a, Arc<ThreadPool>>,
-    Option<Read<'a, HotReloadStrategy>>,
     Write<'a, AssetStorage<Mesh>>,
     Write<'a, AssetStorage<Texture>>,
 );

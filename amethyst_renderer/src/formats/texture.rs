@@ -613,3 +613,6 @@ uuid!{
     TgaFormat => 112532128189795735651293719810927967635,
     BmpFormat => 112532153542807740215881749744992075155
 }
+amethyst_assets::asset_type! {
+    Texture
+}

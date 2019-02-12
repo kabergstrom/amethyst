@@ -71,14 +71,12 @@ pub trait Format<A: Asset>: Send + 'static {
 pub struct FormatValue<A: Asset> {
     /// The format data.
     pub data: A::Data,
-    /// An optional reload structure
-    pub reload: Option<Box<dyn Reload<A>>>,
 }
 
 impl<A: Asset> FormatValue<A> {
     /// Creates a `FormatValue` from only the data (setting `reload` to `None`).
     pub fn data(data: A::Data) -> Self {
-        FormatValue { data, reload: None }
+        FormatValue { data }
     }
 }
 
@@ -123,7 +121,7 @@ where
             let data = T::import(&self, b, options.clone())?;
             let reload = SingleFile::new(self.clone(), m, options, name, source);
             let reload = Some(Box::new(reload) as Box<dyn Reload<A>>);
-            Ok(FormatValue { data, reload })
+            Ok(FormatValue { data })
         } else {
             let b = source.load(&name).chain_err(|| ErrorKind::Source)?;
             let data = T::import(&self, b, options)?;

@@ -1,16 +1,16 @@
-use std::{marker::PhantomData, ops::Deref};
+use std::{marker::PhantomData};
 
 use log::error;
 
 use amethyst_core::{
     specs::{
-        storage::ComponentEvent, BitSet, Entities, Entity, Join, Read, ReadExpect, ReadStorage,
+        storage::ComponentEvent, BitSet, Entities, Entity, Join, ReadStorage,
         ReaderId, Resources, System, Write, WriteStorage,
     },
-    ArcThreadPool, Parent, Time,
+    Parent, 
 };
 
-use crate::{AssetStorage, Completion, Handle, HotReloadStrategy, ProcessingState, ResultExt};
+use crate::{AssetStorage, Completion, Handle, ProcessingState, ResultExt};
 
 use super::{Prefab, PrefabData, PrefabTag};
 
@@ -49,9 +49,6 @@ where
         Entities<'a>,
         Write<'a, AssetStorage<Prefab<T>>>,
         ReadStorage<'a, Handle<Prefab<T>>>,
-        Read<'a, Time>,
-        ReadExpect<'a, ArcThreadPool>,
-        Option<Read<'a, HotReloadStrategy>>,
         WriteStorage<'a, Parent>,
         WriteStorage<'a, PrefabTag<T>>,
         T::SystemData,
@@ -62,14 +59,10 @@ where
             entities,
             mut prefab_storage,
             prefab_handles,
-            time,
-            pool,
-            strategy,
             mut parents,
             mut tags,
             mut prefab_system_data,
         ) = data;
-        let strategy = strategy.as_ref().map(Deref::deref);
         prefab_storage.process(
             |mut d| {
                 d.tag = Some(self.next_tag);
@@ -91,9 +84,6 @@ where
                     Completion::Loading => Ok(ProcessingState::Loading(d)),
                 }
             },
-            time.frame_number(),
-            &**pool,
-            strategy,
         );
         prefab_handles
             .channel()

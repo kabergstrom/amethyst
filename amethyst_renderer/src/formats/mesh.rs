@@ -300,6 +300,9 @@ impl From<VertexBufferCombination> for ComboMeshCreator {
 }
 
 uuid!{
-    MeshData => 152363896001301345872018713952728977845,
+    MeshData => 152363896001301345872018713952728973845,
     ObjFormat => 112532186818635996206903539033451216275
+}
+amethyst_assets::asset_type! {
+    Mesh
 }

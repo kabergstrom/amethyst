@@ -30,6 +30,10 @@ impl Asset for Source {
     type Data = AudioData;
     type HandleStorage = VecStorage<SourceHandle>;
 }
+amethyst_assets::asset_type! {
+    Source
+}
+
 
 impl Into<Result<ProcessingState<Source>>> for AudioData {
     fn into(self) -> Result<ProcessingState<Source>> {

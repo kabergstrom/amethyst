@@ -102,7 +102,7 @@ pub enum FrameRateLimitStrategy {
 
 impl Default for FrameRateLimitStrategy {
     fn default() -> Self {
-        FrameRateLimitStrategy::Yield
+        FrameRateLimitStrategy::Sleep 
     }
 }
 

@@ -6,25 +6,22 @@ use std::{
     },
 };
 
-use crossbeam::queue::MsQueue;
+use crossbeam::queue::SegQueue;
 use derivative::Derivative;
 use hibitset::BitSet;
 use log::{debug, error, trace, warn};
-use rayon::ThreadPool;
 
 use amethyst_core::{
     specs::{
-        prelude::{Component, Read, ReadExpect, System, VecStorage, Write},
+        prelude::{Component, System, VecStorage, Write},
         storage::UnprotectedStorage,
     },
-    Time,
 };
 
 use crate::{
     asset::{Asset, FormatValue},
     error::{Error, ErrorKind, Result, ResultExt},
     progress::Tracker,
-    reload::{HotReloadStrategy, Reload},
 };
 
 /// An `Allocator`, holding a counter for producing unique IDs.
@@ -47,9 +44,8 @@ pub struct AssetStorage<A: Asset> {
     bitset: BitSet,
     handles: Vec<Handle<A>>,
     handle_alloc: Allocator,
-    pub(crate) processed: Arc<MsQueue<Processed<A>>>,
-    reloads: Vec<(WeakHandle<A>, Box<dyn Reload<A>>)>,
-    unused_handles: MsQueue<Handle<A>>,
+    pub(crate) processed: Arc<SegQueue<Processed<A>>>,
+    unused_handles: SegQueue<Handle<A>>,
     requeue: Mutex<Vec<Processed<A>>>,
 }
 
@@ -133,13 +129,10 @@ impl<A: Asset> AssetStorage<A> {
     pub fn process<F>(
         &mut self,
         f: F,
-        frame_number: u64,
-        pool: &ThreadPool,
-        strategy: Option<&HotReloadStrategy>,
     ) where
         F: FnMut(A::Data) -> Result<ProcessingState<A>>,
     {
-        self.process_custom_drop(f, |_| {}, frame_number, pool, strategy);
+        self.process_custom_drop(f, |_| {});
     }
 
     /// Process finished asset data and maintain the storage.
@@ -148,9 +141,6 @@ impl<A: Asset> AssetStorage<A> {
         &mut self,
         mut f: F,
         mut drop_fn: D,
-        frame_number: u64,
-        pool: &ThreadPool,
-        strategy: Option<&HotReloadStrategy>,
     ) where
         D: FnMut(A),
         F: FnMut(A::Data) -> Result<ProcessingState<A>>,
@@ -164,22 +154,21 @@ impl<A: Asset> AssetStorage<A> {
                 let assets = &mut self.assets;
                 let bitset = &mut self.bitset;
                 let handles = &mut self.handles;
-                let reloads = &mut self.reloads;
 
                 let f = &mut f;
-                let (reload_obj, handle) = match processed {
+                match processed {
                     Processed::NewAsset {
                         data,
                         handle,
                         name,
                         tracker,
                     } => {
-                        let (asset, reload_obj) = match data
-                            .map(|FormatValue { data, reload }| (data, reload))
-                            .and_then(|(d, rel)| f(d).map(|a| (a, rel)))
+                        let asset = match data
+                            .map(|FormatValue { data }| data)
+                            .and_then(|d| f(d))
                             .chain_err(|| ErrorKind::Asset(name.clone()))
                         {
-                            Ok((ProcessingState::Loaded(x), r)) => {
+                            Ok(ProcessingState::Loaded(x)) => {
                                 debug!(
                                         "{:?}: Asset {:?} (handle id: {:?}) has been loaded successfully",
                                         A::name(),
@@ -204,9 +193,9 @@ impl<A: Asset> AssetStorage<A> {
                                     tracker.success();
                                 }
 
-                                (x, r)
+                                x
                             }
-                            Ok((ProcessingState::Loading(x), r)) => {
+                            Ok(ProcessingState::Loading(x)) => {
                                 debug!(
                                         "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
                                         A::name(),
@@ -214,7 +203,7 @@ impl<A: Asset> AssetStorage<A> {
                                         handle,
                                     );
                                 requeue.push(Processed::NewAsset {
-                                    data: Ok(FormatValue { data: x, reload: r }),
+                                    data: Ok(FormatValue { data: x }),
                                     handle,
                                     name,
                                     tracker,
@@ -244,71 +233,8 @@ impl<A: Asset> AssetStorage<A> {
                         unsafe {
                             assets.insert(id, asset);
                         }
-
-                        (reload_obj, handle)
-                    }
-                    Processed::HotReload {
-                        data,
-                        handle,
-                        name,
-                        old_reload,
-                    } => {
-                        let (asset, reload_obj) = match data
-                            .map(|FormatValue { data, reload }| (data, reload))
-                            .and_then(|(d, rel)| f(d).map(|a| (a, rel)))
-                            .chain_err(|| ErrorKind::Asset(name.clone()))
-                        {
-                            Ok((ProcessingState::Loaded(x), r)) => (x, r),
-                            Ok((ProcessingState::Loading(x), r)) => {
-                                debug!(
-                                    "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
-                                    A::name(),
-                                    name,
-                                    handle,
-                                );
-                                requeue.push(Processed::HotReload {
-                                    data: Ok(FormatValue { data: x, reload: r }),
-                                    handle,
-                                    name,
-                                    old_reload,
-                                });
-                                continue;
-                            }
-                            Err(e) => {
-                                error!(
-                                    "{:?}: Failed to hot-reload asset {:?} (handle id: {:?}): {}\n\
-                                     Falling back to old reload object.",
-                                    A::name(),
-                                    name,
-                                    handle,
-                                    e,
-                                );
-
-                                reloads.push((handle.downgrade(), old_reload));
-
-                                continue;
-                            }
-                        };
-
-                        let id = handle.id();
-                        assert!(
-                            bitset.contains(id),
-                            "Expected handle {:?} to be valid, but the asset storage says otherwise",
-                            handle,
-                        );
-                        unsafe {
-                            let old = assets.get_mut(id);
-                            *old = asset;
-                        }
-
-                        (reload_obj, handle)
                     }
                 };
-
-                // Add the reload obj if it is `Some`.
-                if let Some(reload_obj) = reload_obj {
-                    reloads.push((handle.downgrade(), reload_obj));
-                }
             }
 
             for p in requeue.drain(..) {
@@ -340,53 +266,6 @@ impl<A: Asset> AssetStorage<A> {
         if count != 0 {
             debug!("{:?}: Freed {} handle ids", A::name(), count,);
         }
-
-        if strategy
-            .map(|s| s.needs_reload(frame_number))
-            .unwrap_or(false)
-        {
-            trace!("{:?}: Testing for asset reloads..", A::name());
-            self.hot_reload(pool);
-        }
-    }
-
-    fn hot_reload(&mut self, pool: &ThreadPool) {
-        self.reloads.retain(|&(ref handle, _)| !handle.is_dead());
-        while let Some(p) = self
-            .reloads
-            .iter()
-            .position(|&(_, ref rel)| rel.needs_reload())
-        {
-            let (handle, rel): (WeakHandle<_>, Box<dyn Reload<_>>) = self.reloads.swap_remove(p);
-
-            let name = rel.name();
-            let format = rel.format();
-            let handle = handle.upgrade();
-
-            debug!(
-                "{:?}: Asset {:?} (handle id: {:?}) needs a reload using format {:?}",
-                A::name(),
-                name,
-                handle,
-                format,
-            );
-
-            if let Some(handle) = handle {
-                let processed = self.processed.clone();
-                pool.spawn(move || {
-                    let old_reload = rel.clone();
-                    let data = rel.reload().chain_err(|| ErrorKind::Format(format));
-
-                    let p = Processed::HotReload {
-                        data,
-                        name,
-                        handle,
-                        old_reload,
-                    };
-                    processed.push(p);
-                });
-            }
-        }
     }
 }
 
@@ -397,9 +276,8 @@ impl<A: Asset> Default for AssetStorage<A> {
             bitset: Default::default(),
             handles: Default::default(),
             handle_alloc: Default::default(),
-            processed: Arc::new(MsQueue::new()),
-            reloads: Default::default(),
-            unused_handles: MsQueue::new(),
+            processed: Arc::new(SegQueue::new()),
+            unused_handles: SegQueue::new(),
             requeue: Mutex::new(Vec::default()),
         }
     }
@@ -437,21 +315,11 @@ where
     A: Asset,
     A::Data: Into<Result<ProcessingState<A>>>,
 {
-    type SystemData = (
-        Write<'a, AssetStorage<A>>,
-        ReadExpect<'a, Arc<ThreadPool>>,
-        Read<'a, Time>,
-        Option<Read<'a, HotReloadStrategy>>,
-    );
+    type SystemData = Write<'a, AssetStorage<A>>;
 
-    fn run(&mut self, (mut storage, pool, time, strategy): Self::SystemData) {
-        use std::ops::Deref;
-
+    fn run(&mut self, mut storage: Self::SystemData) {
         storage.process(
             Into::into,
-            time.frame_number(),
-            &**pool,
-            strategy.as_ref().map(Deref::deref),
         );
     }
 }
@@ -508,12 +376,6 @@ pub(crate) enum Processed<A: Asset> {
         handle: Handle<A>,
         name: String,
         tracker: Box<dyn Tracker>,
-    },
-    HotReload {
-        data: Result<FormatValue<A>>,
-        handle: Handle<A>,
-        name: String,
-        old_reload: Box<dyn Reload<A>>,
     },
 }
 

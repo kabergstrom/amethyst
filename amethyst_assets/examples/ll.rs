@@ -11,7 +11,7 @@ use amethyst_core::specs::prelude::VecStorage;
 struct DummyAsset(String);
 
 impl Asset for DummyAsset {
-    const NAME: &'static str = "example::DummyAsset";
+    fn name() -> &'static str { "example::DummyAsset" }
     type Data = String;
     type HandleStorage = VecStorage<Handle<DummyAsset>>;
 }
@@ -19,7 +19,7 @@ impl Asset for DummyAsset {
 struct DummyFormat;
 
 impl Format<DummyAsset> for DummyFormat {
-    const NAME: &'static str = "DUMMY";
+    fn name() -> &'static str { "DUMMY" }
 
     type Options = ();
 
@@ -78,9 +78,6 @@ fn main() {
 
                 Ok(ProcessingState::Loaded(DummyAsset(s)))
             },
-            frame_number,
-            &*pool,
-            Some(&strategy),
         );
     }
 

@@ -12,7 +12,7 @@ use winit::Event;
 use thread_profiler::{profile_scope, register_thread_with_profiler, write_profile};
 
 use crate::{
-    assets::{Loader, Source},
+    assets::{DefaultLoader, NewLoader, Loader, Source},
     callback_queue::CallbackQueue,
     core::{
         frame_limiter::{FrameLimiter, FrameRateLimitConfig, FrameRateLimitStrategy},
@@ -44,10 +44,11 @@ use crate::{
 /// - `R`: `EventReader` implementation for the given event type `E`
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct CoreApplication<'a, T, E = StateEvent, R = StateEventReader>
+pub struct CoreApplication<'a, T, E = StateEvent, R = StateEventReader, L = DefaultLoader>
 where
     T: 'static,
     E: 'static,
+    L: NewLoader,
 {
     /// The world
     #[derivative(Debug = "ignore")]
@@ -60,6 +61,7 @@ where
     #[derivative(Debug = "ignore")]
     trans_reader_id: ReaderId<TransEvent<T, E>>,
     states: StateMachine<'a, T, E>,
+    pub loader: L,
     ignore_window_close: bool,
     data: T,
 }
@@ -128,12 +130,13 @@ where
 /// ```
 ///
 /// [log]: https://crates.io/crates/log
-pub type Application<'a, T> = CoreApplication<'a, T, StateEvent, StateEventReader>;
+pub type Application<'a, T> = CoreApplication<'a, T, StateEvent, StateEventReader, DefaultLoader>;
 
-impl<'a, T, E, R> CoreApplication<'a, T, E, R>
+impl<'a, T, E, R, L> CoreApplication<'a, T, E, R, L>
 where
     T: 'static,
     E: Clone + Send + Sync + 'static,
+    L: NewLoader + Default,
 {
     /// Creates a new Application with the given initial game state.
     /// This will create and allocate all the needed resources for
@@ -190,6 +193,7 @@ where
         I: DataInit<T>,
         for<'b> R: EventReader<'b, Event = E>,
         R: Default,
+        L: NewLoader,
     {
         ApplicationBuilder::new(path, initial_state)?.build(init)
     }
@@ -198,7 +202,7 @@ where
     ///
     /// This is identical in function to
     /// [ApplicationBuilder::new](struct.ApplicationBuilder.html#method.new).
-    pub fn build<P, S>(path: P, initial_state: S) -> Result<ApplicationBuilder<S, T, E, R>>
+    pub fn build<P, S>(path: P, initial_state: S) -> Result<ApplicationBuilder<S, T, E, R, L>>
     where
         P: AsRef<Path>,
         S: State<T, E> + 'a,
@@ -363,6 +367,8 @@ where
         profile_scope!("maintain");
         self.world.maintain();
 
+        self.loader.process();
+
         // TODO: replace this with a more customizable method.
         // TODO: effectively, the user should have more control over error handling here
         // TODO: because right now the app will just exit in case of an error.
@@ -393,16 +399,17 @@ impl<'a, T, E, R> Drop for CoreApplication<'a, T, E, R> {
 /// using a custom set of configuration. This is the normal way an
 /// [`Application`](struct.Application.html)
 /// object is created.
-pub struct ApplicationBuilder<S, T, E, R> {
+pub struct ApplicationBuilder<S, T, E, R, L = DefaultLoader> {
     // config: Config,
     initial_state: S,
     /// Used by bundles to access the world directly
     pub world: World,
+    loader: Option<L>,
     ignore_window_close: bool,
     phantom: PhantomData<(T, E, R)>,
 }
 
-impl<S, T, E, X> ApplicationBuilder<S, T, E, X>
+impl<S, T, E, X, L: NewLoader + Default> ApplicationBuilder<S, T, E, X, L>
 where
     T: 'static,
 {
@@ -513,6 +520,7 @@ where
         Ok(ApplicationBuilder {
             initial_state,
             world,
+            loader: None,
             ignore_window_close: false,
             phantom: PhantomData,
         })
@@ -822,12 +830,13 @@ where
     ///
     /// See the [example show for `ApplicationBuilder::new()`](struct.ApplicationBuilder.html#examples)
     /// for an example on how this method is used.
-    pub fn build<'a, I>(mut self, init: I) -> Result<CoreApplication<'a, T, E, X>>
+    pub fn build<'a, I>(mut self, init: I) -> Result<CoreApplication<'a, T, E, X, L>>
     where
         S: State<T, E> + 'a,
         I: DataInit<T>,
         E: Clone + Send + Sync + 'static,
         X: Default,
+        L: NewLoader,
         for<'b> X: EventReader<'b, Event = E>,
     {
         trace!("Entering `ApplicationBuilder::build`");
@@ -853,6 +862,7 @@ where
             states: StateMachine::new(self.initial_state),
             reader,
             events: Vec::new(),
+            loader: self.loader.unwrap_or_else(|| L::default()),
             ignore_window_close: self.ignore_window_close,
             data,
             event_reader_id,
