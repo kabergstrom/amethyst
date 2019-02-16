@@ -1,33 +1,61 @@
-use atelier_loader;
+use atelier_loader::{self, AssetTypeId, AssetUuid};
 use crate::{Asset, AssetStorage};
+use amethyst_core::specs::World;
 use serde_dyn::TypeUuid;
 use serde::de::Deserialize;
 use bincode;
-use std::error::Error;
-pub use atelier_loader::{inventory, Loader, DefaultLoader};
+use std::{
+    error::Error,
+    collections::HashMap,
+};
 
-impl<A: Asset> atelier_loader::AssetStorage for AssetStorage<A> 
-where for<'a> A::Data: Deserialize<'a> 
-{
-    fn allocate(&self) -> u32 {
-        self.allocate().id()
+pub use atelier_loader::Loader;
+pub type DefaultLoader = atelier_loader::rpc_loader::RpcLoader<WorldStorages>;
+
+pub struct AssetStorageMap {
+    storages: HashMap<AssetTypeId, AssetType>,
+}
+
+impl AssetStorageMap {
+    pub fn new() -> AssetStorageMap {
+        AssetStorageMap {
+            storages: HashMap::new(),
+        }
     }
-    fn update_asset(&self, handle: u32, data: &dyn AsRef<[u8]>) -> Result<(), Box<dyn Error>>
-    {
-        let asset = bincode::deserialize::<A::Data>(data.as_ref())?;
+}
+
+struct WorldStorages {
+    storage_map: AssetStorageMap,
+    world: &World,
+}
+
+impl atelier_loader::AssetStorage for WorldStorages {
+    type HandleType = u32;
+    fn allocate(&self, asset_type: &AssetTypeId, id: &AssetUuid) -> Self::HandleType {
+        0
+    }
+    fn update_asset(&self, asset_type: &AssetTypeId, handle: &Self::HandleType, data: &dyn AsRef<[u8]>) -> Result<(), Box<dyn Error>> {
+        // let asset = bincode::deserialize::<A::Data>(data.as_ref())?;
         Ok(())
     }
-    fn free(&self, handle: u32) {
+    fn free(&self, asset_type: &AssetTypeId, handle: Self::HandleType) {
 
     }
 }
 
-pub fn create_asset_type<A: Asset>() -> atelier_loader::AssetType 
+pub struct AssetType {
+    pub uuid: u128,
+    // pub create_storage: fn() -> Box<dyn AssetStorage>,
+}
+inventory::collect!(AssetType);
+
+
+pub fn create_asset_type<A: Asset>() -> AssetType 
 where for<'a> A::Data: Deserialize<'a> + TypeUuid
 {
-    atelier_loader::AssetType {
+    AssetType {
         uuid: A::Data::UUID,
-        create_storage: || Box::new(AssetStorage::<A>::default()),
+        // create_storage: || Box::new(AssetStorage::<A>::default()),
     }
 }
 
