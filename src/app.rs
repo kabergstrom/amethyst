@@ -12,7 +12,7 @@ use winit::Event;
 use thread_profiler::{profile_scope, register_thread_with_profiler, write_profile};
 
 use crate::{
-    assets::{DefaultLoader, NewLoader, Loader, Source},
+    assets::{DefaultLoader, NewLoader, Loader, Source, WorldStorages},
     callback_queue::CallbackQueue,
     core::{
         frame_limiter::{FrameLimiter, FrameRateLimitConfig, FrameRateLimitStrategy},
@@ -136,7 +136,7 @@ impl<'a, T, E, R, L> CoreApplication<'a, T, E, R, L>
 where
     T: 'static,
     E: Clone + Send + Sync + 'static,
-    L: NewLoader + Default,
+    L: NewLoader<HandleType = u32> + Default,
 {
     /// Creates a new Application with the given initial game state.
     /// This will create and allocate all the needed resources for
@@ -367,7 +367,8 @@ where
         profile_scope!("maintain");
         self.world.maintain();
 
-        self.loader.process();
+        let storages = WorldStorages::new(&self.world);
+        self.loader.process(&storages);
 
         // TODO: replace this with a more customizable method.
         // TODO: effectively, the user should have more control over error handling here

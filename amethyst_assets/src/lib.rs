@@ -23,7 +23,7 @@ pub use crate::{
     reload::{HotReloadBundle, HotReloadStrategy, HotReloadSystem, Reload, SingleFile},
     source::{Directory, Source},
     storage::{AssetStorage, Handle, ProcessingState, Processor, WeakHandle},
-    new_loader::{create_asset_type, Loader as NewLoader, DefaultLoader},
+    new_loader::{create_asset_type, Loader as NewLoader, DefaultLoader, WorldStorages},
 };
 pub use inventory;
 
