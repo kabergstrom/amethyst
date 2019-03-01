@@ -137,6 +137,88 @@ impl SimpleFormat<Mesh> for ObjFormat {
     }
 }
 
+// #[cfg(feature = "dx12")]
+// pub type Backend = rendy::dx12::Backend;
+
+// #[cfg(feature = "metal")]
+// pub type Backend = rendy::metal::Backend;
+
+// #[cfg(feature = "vulkan")]
+pub type Backend = rendy::vulkan::Backend;
+
+// #[cfg(not(any(feature = "dx12", feature = "metal", feature = "vulkan")))]
+// pub type Backend = rendy::empty::Backend;
+
+/// Mesh wrapper.
+pub struct RendyMesh(pub rendy::mesh::Mesh<Backend>);
+#[derive(Deserialize, Serialize)]
+pub struct RendyMeshBuilder(pub rendy::mesh::MeshBuilder<'static>);
+
+impl Asset for RendyMesh {
+    fn name() -> &'static str { "renderer::Mesh" }
+    type Data = RendyMeshBuilder;
+    type HandleStorage = VecStorage<amethyst_assets::Handle<RendyMesh>>;
+}
+
+amethyst_assets::simple_importer! {
+    "obj" => ObjFormatRendy,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ObjFormatRendy;
+
+impl SimpleFormat<RendyMesh> for ObjFormatRendy {
+    fn name() -> &'static str { "WAVEFRONT_OBJ"}
+
+    type Options = ();
+
+    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<RendyMeshBuilder> {
+        String::from_utf8(bytes)
+            .map_err(Into::into)
+            .and_then(|string| {
+                parse(string)
+                    .map_err(|e| Error::from(format!("In line {}: {:?}", e.line_number, e.message)))
+                    .chain_err(|| "Failed to parse OBJ")
+            })
+            .map(|set| data_to_rendy_mesh_builder(set))
+    }
+}
+
+fn data_to_rendy_mesh_builder(obj_set: ObjSet) -> RendyMeshBuilder {
+    // Takes a list of objects that contain geometries that contain shapes that contain
+    // vertex/texture/normal indices into the main list of vertices, and converts to a
+    // flat vec of `PosNormTex` objects.
+    // TODO: Doesn't differentiate between objects in a `*.obj` file, treats
+    // them all as a single mesh.
+    let vertices: Vec<_> = obj_set.objects.iter().flat_map(|object| {
+        object.geometry.iter().flat_map(move |geometry| {
+            geometry
+                .shapes
+                .iter()
+                .filter_map(move |s| convert_primitive(object, &s.primitive))
+        })
+    }).collect();
+    
+    let mut result: Vec<rendy::mesh::PosNormTex> = Vec::new();
+    for vvv in vertices {
+        result.push(vvv[0].into());
+        result.push(vvv[1].into());
+        result.push(vvv[2].into());
+    }
+
+    RendyMeshBuilder(rendy::mesh::MeshBuilder::<'static>::new().with_vertices(result))
+}
+
+impl From<PosNormTex> for rendy::mesh::PosNormTex {
+    fn from(val: PosNormTex) -> Self {
+        Self {
+            position: val.position.into(),
+            normal: val.normal.into(),
+            tex_coord: val.tex_coord.into(),
+        }
+    }
+}
+
 fn convert(
     object: &Object,
     vi: VertexIndex,
@@ -300,6 +382,8 @@ impl From<VertexBufferCombination> for ComboMeshCreator {
 }
 
 uuid!{
+    RendyMeshBuilder => 257732096547159291203755512963354947254,
+    ObjFormatRendy => 89516663110353598861648425929115196839,
     MeshData => 152363896001301345872018713952728973845,
     ObjFormat => 112532186818635996206903539033451216275
 }

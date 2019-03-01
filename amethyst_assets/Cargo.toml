@@ -40,6 +40,7 @@ serde_dyn = "0.2.2"
 erased-serde = "0.3"
 uuid = { version = "0.7", features = ["v4", "serde"] }
 atelier_loader = { path = "../../atelier-assets/loader" }
+atelier_importer = { path = "../../atelier-assets/importer" }
 bincode = "1.0"
 inventory = "0.1"
 

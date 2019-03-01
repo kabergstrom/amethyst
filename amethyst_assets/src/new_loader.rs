@@ -24,6 +24,7 @@ where for<'a> A::Data: Deserialize<'a> + TypeUuid {
     }
     fn update_asset(&self, handle: u32, data: &dyn AsRef<[u8]>) -> Result<(), Box<dyn Error>> {
         let asset = bincode::deserialize::<A::Data>(data.as_ref())?;
+        println!("got asset");
         Ok(())
     }
     fn free(&self, handle: u32) {

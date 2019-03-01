@@ -43,6 +43,8 @@ fn main() -> amethyst::Result<()> {
     let game_data =
         GameDataBuilder::default().with_bundle(RenderBundle::new(pipe, Some(config)))?;
     let mut game = Application::new("./", Example, game_data)?;
+    use amethyst::assets::NewLoader;
+    game.loader.add_asset_ref(*amethyst::assets::AssetUUID::parse_str("43067e9f-d965-4436-a78b-5798a224af5d").unwrap().as_bytes());
 
     game.run();
 

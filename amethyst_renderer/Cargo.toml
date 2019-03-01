@@ -58,6 +58,8 @@ gfx_device_gl = { version = "0.15", optional = true }
 gfx_window_glutin = { version = "0.27.0", optional = true }
 glutin = { version = "0.19", optional = true }
 
+rendy = { version = "0.1", features = ["vulkan", "mesh-obj", "serde-1", "command", "factory", "frame", "graph", "memory", "mesh", "shader", "resource", "texture", "util", "wsi"], default-features = false, git = "https://github.com/frizi/rendy.git", branch = "serde-imports" }
+
 [target.'cfg(not(target_os = "macos"))'.dependencies]
 gfx_device_vulkan = { version = "0.1", optional = true }
 gfx_window_vulkan = { version = "0.1", optional = true }

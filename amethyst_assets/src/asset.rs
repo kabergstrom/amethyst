@@ -1,10 +1,17 @@
-use std::sync::Arc;
+use std::{
+    sync::Arc, io::Read,
+};
 use ::uuid;
 
 use amethyst_core::specs::storage::UnprotectedStorage;
 
 #[cfg(feature = "profiler")]
 use thread_profiler::profile_scope;
+
+use serde::{Serialize, Deserialize};
+use atelier_importer::{SerdeObj, ImporterValue, ImportedAsset, Importer};
+pub use atelier_importer as importer;
+use serde_dyn::{uuid, TypeUuid};
 
 use crate::{ErrorKind, Handle, Reload, Result, ResultExt, SingleFile, Source};
 
@@ -127,6 +134,100 @@ where
             let data = T::import(&self, b, options)?;
 
             Ok(FormatValue::data(data))
+        }
+    }
+}
+
+/// A simple state for Importer to retain the same UUID between imports
+/// for all single-asset source files
+#[derive(Default, Serialize, Deserialize)]
+pub struct SimpleImporterState {
+    id: Option<AssetUUID>,
+}
+uuid! { SimpleImporterState => 276663539928909366810068622540168088635 }
+
+/// Wrapper struct to be able to impl Importer for any SimpleFormat
+pub struct SimpleImporter<A: Asset, T: SimpleFormat<A> + TypeUuid>(pub T, ::std::marker::PhantomData<A>);
+
+impl<A: Asset, T: SimpleFormat<A> + TypeUuid + 'static> From<T> for SimpleImporter<A, T> {
+    fn from(fmt: T) -> SimpleImporter<A, T> {
+        SimpleImporter(fmt, ::std::marker::PhantomData)
+    }
+}
+impl<A: Asset, T: SimpleFormat<A> + TypeUuid + Send + 'static> TypeUuid for SimpleImporter<A, T>
+where
+    <A as Asset>::Data: SerdeObj, 
+{
+    const UUID: u128 = T::UUID;
+}
+
+impl<A: Asset, T: SimpleFormat<A> + TypeUuid + Send + 'static> Importer for SimpleImporter<A, T>
+where
+    <A as Asset>::Data: SerdeObj,
+{
+    type State = SimpleImporterState;
+    type Options = T::Options;
+
+    fn version_static() -> u32
+    where
+        Self: Sized,
+    {
+        1
+    }
+    fn version(&self) -> u32 {
+        Self::version_static()
+    }
+
+    fn import(
+        &self,
+        source: &mut dyn Read,
+        options: Self::Options,
+        state: &mut Self::State,
+    ) -> importer::Result<ImporterValue> {
+        if state.id.is_none() {
+            state.id = Some(uuid::Uuid::new_v4());
+        }
+        let mut bytes = Vec::new();
+        source.read_to_end(&mut bytes)?;
+        let import_result = self.0.import(bytes, options).map_err(|e| importer::Error::Boxed(Box::new(e)))?;
+        Ok(ImporterValue {
+            assets: vec![ImportedAsset {
+                id: state.id.expect("AssetUUID not generated"),
+                search_tags: Vec::new(),
+                build_deps: Vec::new(),
+                load_deps: Vec::new(),
+                instantiate_deps: Vec::new(),
+                asset_data: Box::new(import_result),
+                build_pipeline: None,
+            }],
+        })
+    }
+}
+
+
+#[macro_export]
+macro_rules! simple_importer {
+    ($($ext:expr => $type:expr),*,) => {
+        $crate::simple_importer! {
+            $(
+                $ext => $type
+            ),*
+        }
+    };
+    ($($ext:expr => $type:expr),*) => {
+        mod _simple_importer_mod {
+            use $crate::inventory;
+            use $crate::importer;
+            use $crate::SimpleImporter;
+            use super::*;
+            $(
+                inventory::submit! {
+                    importer::SourceFileImporter {
+                        extension: $ext,
+                        instantiator: || Box::new(SimpleImporter::from($type)),
+                    }
+                }
+            )*
         }
     }
 }
