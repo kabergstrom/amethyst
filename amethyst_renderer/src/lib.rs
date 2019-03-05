@@ -24,43 +24,10 @@
 //! [gh]: https://github.com/amethyst/amethyst/tree/master/src/renderer
 //! [bk]: https://www.amethyst.rs/book/master/
 
-#![doc(html_logo_url = "https://www.amethyst.rs/assets/amethyst.svg")]
 #![warn(missing_docs, rust_2018_idioms, rust_2018_compatibility)]
 
-use amethyst_core;
-#[macro_use]
-extern crate amethyst_derive;
-#[macro_use]
-extern crate derivative;
-#[macro_use]
-extern crate error_chain;
-use gfx;
-use gfx_core;
-#[macro_use]
-extern crate gfx_macros;
-#[macro_use]
-extern crate log;
-use rayon;
-#[macro_use]
-extern crate serde;
-use shred;
-#[macro_use]
-extern crate shred_derive;
-#[macro_use]
-extern crate serde_dyn;
-use wavefront_obj;
-use winit;
-#[macro_use]
-#[cfg(feature = "profiler")]
-extern crate thread_profiler;
-#[cfg(feature = "opengl")]
-use gfx_device_gl;
-#[cfg(feature = "opengl")]
-use gfx_window_glutin;
-#[cfg(feature = "opengl")]
-use glutin;
-
 pub use crate::{
+    blink::{Blink, BlinkSystem},
     bundle::RenderBundle,
     cam::{ActiveCamera, ActiveCameraPrefab, Camera, CameraPrefab, Projection},
     color::Rgba,
@@ -69,8 +36,8 @@ pub use crate::{
     formats::{
         build_mesh_with_combo, create_mesh_asset, create_texture_asset, BmpFormat,
         ComboMeshCreator, GraphicsPrefab, ImageData, JpgFormat, MaterialPrefab, MeshCreator,
-        MeshData, ObjFormat, PngFormat, TextureData, TextureFormat, TextureMetadata, TexturePrefab,
-        TgaFormat,
+        MeshData, ObjFormat, PngFormat, SpriteRenderPrefab, SpriteSheetFormat, TextureData,
+        TextureFormat, TextureMetadata, TexturePrefab, TgaFormat,
     },
     hidden::{Hidden, HiddenPropagate},
     hide_system::HideHierarchySystem,
@@ -92,15 +59,13 @@ pub use crate::{
     },
     renderer::Renderer,
     resources::{AmbientColor, ScreenDimensions, WindowMessages},
+    screen_space::{ScreenSpace, ScreenSpaceSettings},
     shape::{InternalShape, Shape, ShapePrefab, ShapeUpload},
     skinning::{
         AnimatedComboMeshCreator, AnimatedVertexBufferCombination, JointIds, JointTransforms,
         JointTransformsPrefab, JointWeights,
     },
-    sprite::{
-        Flipped, Sprite, SpriteRender, SpriteSheet, SpriteSheetFormat, SpriteSheetHandle,
-        TextureCoordinates,
-    },
+    sprite::{Flipped, Sprite, SpriteRender, SpriteSheet, SpriteSheetHandle, TextureCoordinates},
     sprite_visibility::{SpriteVisibility, SpriteVisibilitySortingSystem},
     system::RenderSystem,
     tex::{
@@ -118,13 +83,14 @@ pub use crate::{
     visibility::{Visibility, VisibilitySortingSystem},
 };
 
-pub mod error;
+mod error;
 pub mod mouse;
 pub mod pipe;
 
 #[macro_use]
 mod macros;
 
+mod blink;
 mod bundle;
 mod cam;
 mod color;
@@ -140,6 +106,7 @@ mod mtl;
 mod pass;
 mod renderer;
 mod resources;
+mod screen_space;
 mod shape;
 mod skinning;
 mod sprite;

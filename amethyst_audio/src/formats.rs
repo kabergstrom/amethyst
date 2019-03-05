@@ -1,10 +1,13 @@
 use amethyst_assets::*;
+use amethyst_error::Error;
+
+use serde::{Deserialize, Serialize};
 
 use super::Source as Audio;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct AudioData(pub Vec<u8>);
-uuid!{
+serde_dyn::uuid! {
     AudioData => 152363896001301345872018713952728977845
 }
 
@@ -13,11 +16,13 @@ uuid!{
 pub struct WavFormat;
 
 impl SimpleFormat<Audio> for WavFormat {
-    fn name() -> &'static str { "WAV"}
+    fn name() -> &'static str {
+        "WAV"
+    }
 
     type Options = ();
 
-    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData> {
+    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData, Error> {
         Ok(AudioData(bytes))
     }
 }
@@ -27,11 +32,13 @@ impl SimpleFormat<Audio> for WavFormat {
 pub struct OggFormat;
 
 impl SimpleFormat<Audio> for OggFormat {
-    fn name() -> &'static str {"OGG"}
+    fn name() -> &'static str {
+        "OGG"
+    }
 
     type Options = ();
 
-    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData> {
+    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData, Error> {
         Ok(AudioData(bytes))
     }
 }
@@ -41,11 +48,13 @@ impl SimpleFormat<Audio> for OggFormat {
 pub struct FlacFormat;
 
 impl SimpleFormat<Audio> for FlacFormat {
-    fn name() -> &'static str {"FLAC"}
+    fn name() -> &'static str {
+        "FLAC"
+    }
 
     type Options = ();
 
-    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData> {
+    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData, Error> {
         Ok(AudioData(bytes))
     }
 }
@@ -55,11 +64,13 @@ impl SimpleFormat<Audio> for FlacFormat {
 pub struct Mp3Format;
 
 impl SimpleFormat<Audio> for Mp3Format {
-    fn name() -> &'static str { "MP3"}
+    fn name() -> &'static str {
+        "MP3"
+    }
 
     type Options = ();
 
-    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData> {
+    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<AudioData, Error> {
         Ok(AudioData(bytes))
     }
 }
@@ -77,11 +88,13 @@ pub enum AudioFormat {
 }
 
 impl SimpleFormat<Audio> for AudioFormat {
-    fn name() -> &'static str { "AudioFormat"}
+    fn name() -> &'static str {
+        "AudioFormat"
+    }
 
     type Options = ();
 
-    fn import(&self, bytes: Vec<u8>, options: ()) -> Result<AudioData> {
+    fn import(&self, bytes: Vec<u8>, options: ()) -> Result<AudioData, Error> {
         match *self {
             AudioFormat::Ogg => SimpleFormat::import(&OggFormat, bytes, options),
             AudioFormat::Wav => SimpleFormat::import(&WavFormat, bytes, options),

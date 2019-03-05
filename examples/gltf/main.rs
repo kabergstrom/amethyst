@@ -1,28 +1,30 @@
 //! Displays a 2D GLTF scene
 
-#[macro_use]
-extern crate amethyst;
-
-#[macro_use]
-extern crate serde;
-
-use amethyst::animation::{
-    get_animation_set, AnimationBundle, AnimationCommand, AnimationControlSet, AnimationSet,
-    EndControl, VertexSkinningBundle,
+use amethyst::{
+    animation::{
+        get_animation_set, AnimationBundle, AnimationCommand, AnimationControlSet, AnimationSet,
+        EndControl, VertexSkinningBundle,
+    },
+    assets::{
+        AssetPrefab, Completion, Handle, Prefab, PrefabData, PrefabLoader, PrefabLoaderSystem,
+        ProgressCounter, RonFormat,
+    },
+    controls::{ControlTagPrefab, FlyControlBundle},
+    core::transform::{Transform, TransformBundle},
+    derive::PrefabData,
+    ecs::prelude::{Entity, ReadStorage, Write, WriteStorage},
+    input::{is_close_requested, is_key_down},
+    prelude::*,
+    renderer::*,
+    utils::{
+        application_root_dir,
+        tag::{Tag, TagFinder},
+    },
+    Error,
 };
-use amethyst::assets::{
-    AssetPrefab, Completion, Handle, Prefab, PrefabData, PrefabError, PrefabLoader,
-    PrefabLoaderSystem, ProgressCounter, RonFormat,
-};
-use amethyst::controls::{ControlTagPrefab, FlyControlBundle};
-use amethyst::core::transform::{Transform, TransformBundle};
-use amethyst::ecs::prelude::{Entity, ReadStorage, Write, WriteStorage};
-use amethyst::input::{is_close_requested, is_key_down};
-use amethyst::prelude::*;
-use amethyst::renderer::*;
-use amethyst::utils::application_root_dir;
-use amethyst::utils::tag::{Tag, TagFinder};
 use amethyst_gltf::{GltfSceneAsset, GltfSceneFormat, GltfSceneLoaderSystem};
+
+use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 struct Example {
@@ -184,13 +186,7 @@ fn main() -> Result<(), amethyst::Error> {
             "gltf_loader",
             &["scene_loader"], // This is important so that entity instantiation is performed in a single frame.
         )
-        .with_basic_renderer(
-            path,
-            DrawPbmSeparate::new()
-                .with_vertex_skinning()
-                .with_transparency(ColorMask::all(), ALPHA, Some(DepthMode::LessEqualWrite)),
-            false,
-        )?
+        .with_basic_renderer(path, DrawPbmSeparate::new().with_vertex_skinning(), false)?
         .with_bundle(
             AnimationBundle::<usize, Transform>::new("animation_control", "sampler_interpolation")
                 .with_dep(&["gltf_loader"]),

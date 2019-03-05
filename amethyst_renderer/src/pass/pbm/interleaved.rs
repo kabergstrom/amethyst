@@ -2,6 +2,7 @@
 
 use std::marker::PhantomData;
 
+use derivative::Derivative;
 use gfx::pso::buffer::ElemStride;
 use gfx_core::state::{Blend, ColorMask};
 
@@ -10,17 +11,17 @@ use amethyst_core::{
     specs::prelude::{Join, Read, ReadExpect, ReadStorage},
     transform::GlobalTransform,
 };
+use amethyst_error::Error;
 
 use crate::{
     cam::{ActiveCamera, Camera},
-    error::Result,
     hidden::{Hidden, HiddenPropagate},
     light::Light,
     mesh::{Mesh, MeshHandle},
     mtl::{Material, MaterialDefaults},
     pass::{
         shaded_util::{set_light_args, setup_light_buffers},
-        util::{draw_mesh, get_camera, setup_textures, setup_vertex_args},
+        util::{default_transparency, draw_mesh, get_camera, setup_textures, setup_vertex_args},
     },
     pipe::{
         pass::{Pass, PassData},
@@ -31,6 +32,7 @@ use crate::{
     types::{Encoder, Factory},
     vertex::{Normal, Position, Query, Tangent, TexCoord},
     visibility::Visibility,
+    Rgba,
 };
 
 use super::*;
@@ -47,6 +49,7 @@ use super::*;
 #[derivative(Default(bound = "V: Query<(Position, Normal, Tangent, TexCoord)>"))]
 pub struct DrawPbm<V> {
     _pd: PhantomData<V>,
+    #[derivative(Default(value = "default_transparency()"))]
     transparency: Option<(ColorMask, Blend, Option<DepthMode>)>,
 }
 
@@ -59,8 +62,24 @@ where
         Default::default()
     }
 
-    /// Enable transparency
-    pub fn with_transparency(
+    /// Transparency is enabled by default.
+    /// If you pass false to this function transparency will be disabled.
+    ///
+    /// If you pass true and this was disabled previously default settings will be reinstated.
+    /// If you pass true and this was already enabled this will do nothing.
+    pub fn with_transparency(mut self, input: bool) -> Self {
+        if input {
+            if self.transparency.is_none() {
+                self.transparency = default_transparency();
+            }
+        } else {
+            self.transparency = None;
+        }
+        self
+    }
+
+    /// Set transparency settings to custom values.
+    pub fn with_transparency_settings(
         mut self,
         mask: ColorMask,
         blend: Blend,
@@ -76,7 +95,7 @@ where
     V: Query<(Position, Normal, Tangent, TexCoord)>,
 {
     type Data = (
-        Option<Read<'a, ActiveCamera>>,
+        Read<'a, ActiveCamera>,
         ReadStorage<'a, Camera>,
         Read<'a, AmbientColor>,
         Read<'a, AssetStorage<Mesh>>,
@@ -89,6 +108,7 @@ where
         ReadStorage<'a, Material>,
         ReadStorage<'a, GlobalTransform>,
         ReadStorage<'a, Light>,
+        ReadStorage<'a, Rgba>,
     );
 }
 
@@ -96,7 +116,7 @@ impl<V> Pass for DrawPbm<V>
 where
     V: Query<(Position, Normal, Tangent, TexCoord)>,
 {
-    fn compile(&mut self, effect: NewEffect<'_>) -> Result<Effect> {
+    fn compile(&mut self, effect: NewEffect<'_>) -> Result<Effect, Error> {
         let mut builder = effect.simple(VERT_SRC, FRAG_SRC);
         builder.with_raw_vertex_buffer(V::QUERIED_ATTRIBUTES, V::size() as ElemStride, 0);
         setup_vertex_args(&mut builder);
@@ -128,6 +148,7 @@ where
             material,
             global,
             light,
+            rgba,
         ): <Self as PassData<'a>>::Data,
     ) {
         let camera = get_camera(active, &camera, &global);
@@ -136,8 +157,15 @@ where
 
         match visibility {
             None => {
-                for (mesh, material, global, _, _) in
-                    (&mesh, &material, &global, !&hidden, !&hidden_prop).join()
+                for (mesh, material, global, rgba, _, _) in (
+                    &mesh,
+                    &material,
+                    &global,
+                    rgba.maybe(),
+                    !&hidden,
+                    !&hidden_prop,
+                )
+                    .join()
                 {
                     draw_mesh(
                         encoder,
@@ -148,6 +176,7 @@ where
                         &tex_storage,
                         Some(material),
                         &material_defaults,
+                        rgba,
                         camera,
                         Some(global),
                         &[V::QUERIED_ATTRIBUTES],
@@ -156,8 +185,14 @@ where
                 }
             }
             Some(ref visibility) => {
-                for (mesh, material, global, _) in
-                    (&mesh, &material, &global, &visibility.visible_unordered).join()
+                for (mesh, material, global, rgba, _) in (
+                    &mesh,
+                    &material,
+                    &global,
+                    rgba.maybe(),
+                    &visibility.visible_unordered,
+                )
+                    .join()
                 {
                     draw_mesh(
                         encoder,
@@ -168,6 +203,7 @@ where
                         &tex_storage,
                         Some(material),
                         &material_defaults,
+                        rgba,
                         camera,
                         Some(global),
                         &[V::QUERIED_ATTRIBUTES],
@@ -186,6 +222,7 @@ where
                             &tex_storage,
                             material.get(*entity),
                             &material_defaults,
+                            rgba.get(*entity),
                             camera,
                             global.get(*entity),
                             &[V::QUERIED_ATTRIBUTES],

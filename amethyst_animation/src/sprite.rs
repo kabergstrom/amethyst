@@ -1,4 +1,6 @@
+use log::error;
 use minterpolate::InterpolationPrimitive;
+use serde::{Deserialize, Serialize};
 
 use amethyst_assets::Handle;
 use amethyst_renderer::{SpriteRender, SpriteSheet};
@@ -7,9 +9,11 @@ use crate::{AnimationSampling, ApplyData, BlendMethod};
 
 /// Sampler primitive for SpriteRender animations
 /// Note that sprites can only ever be animated with `Step`, or a panic will occur.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(untagged)]
 pub enum SpriteRenderPrimitive {
     /// A spritesheet id
+    #[serde(skip)]
     SpriteSheet(Handle<SpriteSheet>),
     /// An index into a spritesheet
     SpriteIndex(usize),
@@ -63,8 +67,7 @@ impl AnimationSampling for SpriteRender {
     type Channel = SpriteRenderChannel;
 
     fn apply_sample(&mut self, channel: &Self::Channel, data: &Self::Primitive, _: &()) {
-        use self::SpriteRenderChannel as Channel;
-        use self::SpriteRenderPrimitive as Primitive;
+        use self::{SpriteRenderChannel as Channel, SpriteRenderPrimitive as Primitive};
         match (channel, data) {
             (Channel::SpriteSheet, Primitive::SpriteSheet(handle)) => {
                 self.sprite_sheet = handle.clone();
@@ -92,8 +95,7 @@ impl AnimationSampling for SpriteRender {
     }
 
     fn current_sample(&self, channel: &Self::Channel, _: &()) -> Self::Primitive {
-        use self::SpriteRenderChannel as Channel;
-        use self::SpriteRenderPrimitive as Primitive;
+        use self::{SpriteRenderChannel as Channel, SpriteRenderPrimitive as Primitive};
 
         match channel {
             Channel::SpriteSheet => Primitive::SpriteSheet(self.sprite_sheet.clone()),

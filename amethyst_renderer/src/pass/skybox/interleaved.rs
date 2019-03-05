@@ -5,19 +5,20 @@ use amethyst_core::{
     specs::{Read, ReadStorage},
     transform::GlobalTransform,
 };
+use amethyst_error::Error;
 
 use crate::{
-    error::Result,
     get_camera,
     pipe::{
         pass::{Pass, PassData},
         DepthMode, Effect, NewEffect,
     },
-    set_vertex_args, ActiveCamera, Camera, Encoder, Factory, Mesh, PosTex, Shape, VertexFormat,
+    set_vertex_args, ActiveCamera, Camera, Encoder, Factory, Mesh, PosTex, Rgba, Shape,
+    VertexFormat,
 };
 
 use gfx::pso::buffer::ElemStride;
-use glsl_layout::{mat4, Uniform};
+use glsl_layout::{mat4, vec4, Uniform};
 
 use super::{SkyboxColor, FRAG_SRC, VERT_SRC};
 
@@ -27,6 +28,7 @@ pub(crate) struct VertexArgs {
     proj: mat4,
     view: mat4,
     model: mat4,
+    rgba: vec4,
 }
 
 /// Draw a simple gradient skybox
@@ -44,7 +46,7 @@ impl DrawSkybox {
 
 impl<'a> PassData<'a> for DrawSkybox {
     type Data = (
-        Option<Read<'a, ActiveCamera>>,
+        Read<'a, ActiveCamera>,
         ReadStorage<'a, Camera>,
         ReadStorage<'a, GlobalTransform>,
         Read<'a, SkyboxColor>,
@@ -52,7 +54,7 @@ impl<'a> PassData<'a> for DrawSkybox {
 }
 
 impl Pass for DrawSkybox {
-    fn compile(&mut self, mut effect: NewEffect<'_>) -> Result<Effect> {
+    fn compile(&mut self, mut effect: NewEffect<'_>) -> Result<Effect, Error> {
         let verts = Shape::Cube.generate_vertices::<Vec<PosTex>>(None);
         self.mesh = Some(Mesh::build(verts).build(&mut effect.factory)?);
 
@@ -86,7 +88,13 @@ impl Pass for DrawSkybox {
             .as_ref()
             .expect("Pass doesn't seem to be compiled.");
 
-        set_vertex_args(effect, encoder, camera, &GlobalTransform(na::one()));
+        set_vertex_args(
+            effect,
+            encoder,
+            camera,
+            &GlobalTransform(na::one()),
+            Rgba::WHITE,
+        );
 
         if let Some(vbuf) = mesh.buffer(PosTex::ATTRIBUTES) {
             effect.data.vertex_bufs.push(vbuf.clone());

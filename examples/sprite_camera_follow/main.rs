@@ -1,5 +1,3 @@
-use amethyst;
-
 use amethyst::{
     assets::{AssetStorage, Loader},
     core::{Parent, Transform, TransformBundle},
@@ -7,9 +5,9 @@ use amethyst::{
     input::{InputBundle, InputHandler},
     prelude::*,
     renderer::{
-        Camera, ColorMask, DepthMode, DisplayConfig, DrawFlat2D, Pipeline, PngFormat, Projection,
-        RenderBundle, SpriteRender, SpriteSheet, SpriteSheetFormat, SpriteSheetHandle, Stage,
-        Texture, TextureMetadata, Transparent, ALPHA,
+        Camera, DisplayConfig, DrawFlat2D, Pipeline, PngFormat, Projection, RenderBundle,
+        ScreenSpace, SpriteRender, SpriteSheet, SpriteSheetFormat, SpriteSheetHandle, Stage,
+        Texture, TextureMetadata, Transparent,
     },
     utils::application_root_dir,
 };
@@ -92,6 +90,25 @@ fn init_reference_sprite(world: &mut World, sprite_sheet: &SpriteSheetHandle) ->
         .build()
 }
 
+// Initialize a sprite as a reference point using a screen position
+fn init_screen_reference_sprite(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
+    let mut transform = Transform::default();
+    transform.set_x(60.0);
+    transform.set_y(10.0);
+    transform.set_z(-20.0);
+    let sprite = SpriteRender {
+        sprite_sheet: sprite_sheet.clone(),
+        sprite_number: 0,
+    };
+    world
+        .create_entity()
+        .with(transform)
+        .with(sprite)
+        .with(Transparent)
+        .with(ScreenSpace)
+        .build()
+}
+
 fn init_player(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
     let mut transform = Transform::default();
     transform.set_x(0.0);
@@ -109,7 +126,7 @@ fn init_player(world: &mut World, sprite_sheet: &SpriteSheetHandle) -> Entity {
         .build()
 }
 
-fn init_camera(world: &mut World, parent: Entity) {
+fn init_camera(world: &mut World, parent: Entity) -> Entity {
     let mut transform = Transform::default();
     transform.set_z(1.0);
     world
@@ -119,7 +136,7 @@ fn init_camera(world: &mut World, parent: Entity) {
         )))
         .with(Parent { entity: parent })
         .with(transform)
-        .build();
+        .build()
 }
 
 struct Example;
@@ -135,7 +152,8 @@ impl SimpleState for Example {
         let _background = init_background_sprite(world, &background_sprite_sheet_handle);
         let _reference = init_reference_sprite(world, &circle_sprite_sheet_handle);
         let parent = init_player(world, &circle_sprite_sheet_handle);
-        init_camera(world, parent);
+        let _camera_entity = init_camera(world, parent);
+        let _reference_screen = init_screen_reference_sprite(world, &circle_sprite_sheet_handle);
     }
 }
 
@@ -147,11 +165,7 @@ fn main() -> amethyst::Result<()> {
     let pipe = Pipeline::build().with_stage(
         Stage::with_backbuffer()
             .clear_target([0.1, 0.1, 0.1, 1.0], 1.0)
-            .with_pass(DrawFlat2D::new().with_transparency(
-                ColorMask::all(),
-                ALPHA,
-                Some(DepthMode::LessEqualWrite), // Tells the pipeline to respect sprite z-depth
-            )),
+            .with_pass(DrawFlat2D::new()),
     );
 
     let game_data = GameDataBuilder::default()

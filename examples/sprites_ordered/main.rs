@@ -3,10 +3,6 @@
 //! Sprites are originally from <https://opengameart.org/content/bat-32x32>, edited to show
 //! layering and blending.
 
-use amethyst;
-#[macro_use]
-extern crate log;
-
 mod png_loader;
 mod sprite;
 mod sprite_sheet_loader;
@@ -21,12 +17,14 @@ use amethyst::{
     input::{get_key, is_close_requested, is_key_down},
     prelude::*,
     renderer::{
-        Camera, ColorMask, DepthMode, DisplayConfig, DrawFlat2D, ElementState, Hidden, Pipeline,
-        Projection, RenderBundle, ScreenDimensions, SpriteRender, SpriteSheet, SpriteSheetHandle,
-        Stage, Transparent, VirtualKeyCode, ALPHA,
+        Camera, DisplayConfig, DrawFlat2D, ElementState, Hidden, Pipeline, Projection,
+        RenderBundle, ScreenDimensions, SpriteRender, SpriteSheet, SpriteSheetHandle, Stage,
+        Transparent, VirtualKeyCode,
     },
     utils::application_root_dir,
 };
+
+use log::info;
 
 use crate::sprite::SpriteSheetDefinition;
 
@@ -358,11 +356,7 @@ fn main() -> amethyst::Result<()> {
     let pipe = Pipeline::build().with_stage(
         Stage::with_backbuffer()
             .clear_target([0., 0., 0., 1.], 5.)
-            .with_pass(DrawFlat2D::new().with_transparency(
-                ColorMask::all(),
-                ALPHA,
-                Some(DepthMode::LessEqualWrite),
-            )),
+            .with_pass(DrawFlat2D::new()),
     );
 
     let assets_directory = app_root.join("examples/assets/");

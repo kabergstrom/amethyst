@@ -1,10 +1,8 @@
-use ron::de::from_bytes as from_ron_bytes;
+use serde::{Deserialize, Serialize};
 
-use amethyst_assets::{
-    Asset, Error as AssetsError, ErrorKind as AssetsErrorKind, Handle, ProcessingState,
-    Result as AssetsResult, SimpleFormat,
-};
+use amethyst_assets::{Asset, Handle, ProcessingState};
 use amethyst_core::specs::prelude::{Component, DenseVecStorage, VecStorage};
+use amethyst_error::Error;
 
 use crate::Texture;
 
@@ -28,8 +26,8 @@ impl Asset for SpriteSheet {
     type HandleStorage = VecStorage<Handle<Self>>;
 }
 
-impl From<SpriteSheet> for AssetsResult<ProcessingState<SpriteSheet>> {
-    fn from(sprite_sheet: SpriteSheet) -> AssetsResult<ProcessingState<SpriteSheet>> {
+impl From<SpriteSheet> for Result<ProcessingState<SpriteSheet>, Error> {
+    fn from(sprite_sheet: SpriteSheet) -> Result<ProcessingState<SpriteSheet>, Error> {
         Ok(ProcessingState::Loaded(sprite_sheet))
     }
 }
@@ -200,128 +198,6 @@ pub struct SpriteRender {
 
 impl Component for SpriteRender {
     type Storage = VecStorage<Self>;
-}
-
-/// Structure acting as scaffolding for serde when loading a spritesheet file.
-/// Positions originate in the top-left corner (bitmap image convention).
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-struct SpritePosition {
-    /// Horizontal position of the sprite in the sprite sheet
-    pub x: u32,
-    /// Vertical position of the sprite in the sprite sheet
-    pub y: u32,
-    /// Width of the sprite
-    pub width: u32,
-    /// Height of the sprite
-    pub height: u32,
-    /// Number of pixels to shift the sprite to the left and down relative to the entity holding it
-    pub offsets: Option<[f32; 2]>,
-}
-
-/// Structure acting as scaffolding for serde when loading a spritesheet file.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-struct SerializedSpriteSheet {
-    /// Width of the sprite sheet
-    pub spritesheet_width: u32,
-    /// Height of the sprite sheet
-    pub spritesheet_height: u32,
-    /// Description of the sprites
-    pub sprites: Vec<SpritePosition>,
-}
-
-/// Allows loading of sprite sheets in RON format.
-///
-/// This format allows to conveniently load a sprite sheet from a RON file.
-///
-/// Example:
-/// ```text,ignore
-/// (
-///     // Width of the sprite sheet
-///     spritesheet_width: 48.0,
-///     // Height of the sprite sheet
-///     spritesheet_height: 16.0,
-///     // List of sprites the sheet holds
-///     sprites: [
-///         (
-///             // Horizontal position of the sprite in the sprite sheet
-///             x: 0.0,
-///             // Vertical position of the sprite in the sprite sheet
-///             y: 0.0,
-///             // Width of the sprite
-///             width: 16.0,
-///             // Height of the sprite
-///             height: 16.0,
-///             // Number of pixels to shift the sprite to the left and down relative to the entity holding it when rendering
-///             offsets: (0.0, 0.0), // This is optional and defaults to (0.0, 0.0)
-///         ),
-///         (
-///             x: 16.0,
-///             y: 0.0,
-///             width: 32.0,
-///             height: 16.0,
-///         ),
-///     ],
-/// )
-/// ```
-///
-/// Such a spritesheet description can be loaded using a `Loader` by passing it the handle of the corresponding loaded texture.
-/// ```rust,no_run
-/// # extern crate amethyst_assets;
-/// # extern crate amethyst_core;
-/// # extern crate amethyst_renderer;
-/// # use amethyst_assets::{Loader, AssetStorage};
-/// # use amethyst_renderer::{SpriteSheetFormat, SpriteSheet, Texture, PngFormat, TextureMetadata};
-/// #
-/// # fn load_sprite_sheet() {
-/// #   let world = amethyst_core::specs::World::new(); // Normally, you would use Amethyst's world
-/// #   let loader = world.read_resource::<Loader>();
-/// #   let spritesheet_storage = world.read_resource::<AssetStorage<SpriteSheet>>();
-/// #   let texture_storage = world.read_resource::<AssetStorage<Texture>>();
-/// let texture_handle = loader.load(
-///     "my_texture.png",
-///     PngFormat,
-///     TextureMetadata::srgb(),
-///     (),
-///     &texture_storage,
-/// );
-/// let spritesheet_handle = loader.load(
-///     "my_spritesheet.ron",
-///     SpriteSheetFormat,
-///     texture_handle,
-///     (),
-///     &spritesheet_storage,
-/// );
-/// # }
-/// ```
-#[derive(Clone, Deserialize, Serialize)]
-pub struct SpriteSheetFormat;
-
-impl SimpleFormat<SpriteSheet> for SpriteSheetFormat {
-    fn name() -> &'static str { "SPRITE_SHEET"}
-
-    type Options = Handle<Texture>;
-
-    fn import(&self, bytes: Vec<u8>, texture: Self::Options) -> AssetsResult<SpriteSheet> {
-        let sheet: SerializedSpriteSheet = from_ron_bytes(&bytes).map_err(|_| {
-            AssetsError::from_kind(AssetsErrorKind::Format(
-                "Failed to parse Ron file for SpriteSheet",
-            ))
-        })?;
-        let mut sprites: Vec<Sprite> = Vec::with_capacity(sheet.sprites.len());
-        for sp in sheet.sprites {
-            let sprite = Sprite::from_pixel_values(
-                sheet.spritesheet_width as u32,
-                sheet.spritesheet_height as u32,
-                sp.width as u32,
-                sp.height as u32,
-                sp.x as u32,
-                sp.y as u32,
-                sp.offsets.unwrap_or([0.0; 2]),
-            );
-            sprites.push(sprite);
-        }
-        Ok(SpriteSheet { texture, sprites })
-    }
 }
 
 #[cfg(test)]

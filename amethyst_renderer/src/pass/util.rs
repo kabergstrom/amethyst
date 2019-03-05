@@ -1,10 +1,15 @@
 use std::mem;
 
+use gfx_core::state::{Blend, ColorMask};
 use glsl_layout::*;
+use log::error;
+
+#[cfg(feature = "profiler")]
+use thread_profiler::profile_scope;
 
 use amethyst_assets::AssetStorage;
 use amethyst_core::{
-    nalgebra::Matrix4,
+    nalgebra::{Matrix4, Orthographic3},
     specs::prelude::{Join, Read, ReadStorage},
     GlobalTransform,
 };
@@ -14,11 +19,14 @@ use crate::{
     mesh::Mesh,
     mtl::{Material, MaterialDefaults, TextureOffset},
     pass::set_skinning_buffers,
-    pipe::{Effect, EffectBuilder},
+    pipe::{DepthMode, Effect, EffectBuilder},
+    resources::ScreenDimensions,
+    screen_space::ScreenSpaceSettings,
     skinning::JointTransforms,
     tex::Texture,
     types::Encoder,
     vertex::Attributes,
+    Rgba,
 };
 
 pub(crate) enum TextureType {
@@ -44,6 +52,7 @@ pub(crate) struct VertexArgs {
     proj: mat4,
     view: mat4,
     model: mat4,
+    rgba: vec4,
 }
 
 #[repr(C, align(16))]
@@ -67,6 +76,8 @@ pub(crate) fn set_attribute_buffers(
     mesh: &Mesh,
     attributes: &[Attributes<'static>],
 ) -> bool {
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_setattributebuffers");
     for attr in attributes.iter() {
         match mesh.buffer(attr) {
             Some(vbuf) => effect.data.vertex_bufs.push(vbuf.clone()),
@@ -89,6 +100,10 @@ pub(crate) fn add_texture(effect: &mut Effect, texture: &Texture) {
 
 pub(crate) fn setup_textures(builder: &mut EffectBuilder<'_>, types: &[TextureType]) {
     use self::TextureType::*;
+
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_setuptextures");
+
     for ty in types {
         match *ty {
             Albedo => builder.with_texture("albedo"),
@@ -112,6 +127,7 @@ pub(crate) fn add_textures(
     types: &[TextureType],
 ) {
     use self::TextureType::*;
+
     for ty in types {
         let texture = match *ty {
             Albedo => storage
@@ -143,6 +159,10 @@ pub(crate) fn add_textures(
 
 pub(crate) fn setup_texture_offsets(builder: &mut EffectBuilder<'_>, types: &[TextureType]) {
     use self::TextureType::*;
+
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_setuptextureoffsets");
+
     for ty in types {
         match *ty {
             Albedo => builder.with_raw_constant_buffer(
@@ -191,6 +211,7 @@ pub(crate) fn set_texture_offsets(
     types: &[TextureType],
 ) {
     use self::TextureType::*;
+
     for ty in types {
         match *ty {
             Albedo => effect.update_constant_buffer(
@@ -233,6 +254,9 @@ pub(crate) fn set_texture_offsets(
 }
 
 pub(crate) fn setup_vertex_args(builder: &mut EffectBuilder<'_>) {
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_setupvertexargs");
+
     builder.with_raw_constant_buffer(
         "VertexArgs",
         mem::size_of::<<VertexArgs as Uniform>::Std140>(),
@@ -246,6 +270,7 @@ pub fn set_vertex_args(
     encoder: &mut Encoder,
     camera: Option<(&Camera, &GlobalTransform)>,
     global: &GlobalTransform,
+    rgba: Rgba,
 ) {
     let vertex_args = camera
         .as_ref()
@@ -261,6 +286,7 @@ pub fn set_vertex_args(
                 proj: proj.into(),
                 view: view.into(),
                 model: model.into(),
+                rgba: rgba.into(),
             }
         })
         .unwrap_or_else(|| {
@@ -271,16 +297,21 @@ pub fn set_vertex_args(
                 proj: proj.into(),
                 view: view.into(),
                 model: model.into(),
+                rgba: rgba.into(),
             }
         });
     effect.update_constant_buffer("VertexArgs", &vertex_args.std140(), encoder);
 }
 
+/// Sets the view arguments in the contant buffer.
 pub fn set_view_args(
     effect: &mut Effect,
     encoder: &mut Encoder,
     camera: Option<(&Camera, &GlobalTransform)>,
 ) {
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_setviewargs");
+
     let view_args = camera
         .as_ref()
         .map(|&(ref cam, ref transform)| {
@@ -305,6 +336,33 @@ pub fn set_view_args(
     effect.update_constant_buffer("ViewArgs", &view_args.std140(), encoder);
 }
 
+/// Sets the view arguments in the constant buffer using the screen dimensions.
+pub fn set_view_args_screen(
+    effect: &mut Effect,
+    encoder: &mut Encoder,
+    screen_dimensions: &ScreenDimensions,
+    settings: &ScreenSpaceSettings,
+) {
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_setviewargsscreen");
+
+    let proj: [[f32; 4]; 4] = Orthographic3::new(
+        0.0,
+        screen_dimensions.width(),
+        0.0,
+        screen_dimensions.height(),
+        0.1,
+        settings.max_depth,
+    )
+    .to_homogeneous()
+    .into();
+    let view_args = ViewArgs {
+        proj: proj.into(),
+        view: settings.view_matrix.into(),
+    };
+    effect.update_constant_buffer("ViewArgs", &view_args.std140(), encoder);
+}
+
 pub(crate) fn draw_mesh(
     encoder: &mut Encoder,
     effect: &mut Effect,
@@ -314,11 +372,15 @@ pub(crate) fn draw_mesh(
     tex_storage: &AssetStorage<Texture>,
     material: Option<&Material>,
     material_defaults: &MaterialDefaults,
+    rgba: Option<&Rgba>,
     camera: Option<(&Camera, &GlobalTransform)>,
     global: Option<&GlobalTransform>,
     attributes: &[Attributes<'static>],
     textures: &[TextureType],
 ) {
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_drawmesh");
+
     // Return straight away if some parameters are none
     // Consider changing function signature?
     let (mesh, material, global) = match (mesh, material, global) {
@@ -333,7 +395,13 @@ pub(crate) fn draw_mesh(
         return;
     }
 
-    set_vertex_args(effect, encoder, camera, global);
+    set_vertex_args(
+        effect,
+        encoder,
+        camera,
+        global,
+        rgba.cloned().unwrap_or(Rgba::WHITE),
+    );
 
     if skinning {
         if let Some(joint) = joint {
@@ -356,15 +424,27 @@ pub(crate) fn draw_mesh(
 
 /// Returns the main camera and its `GlobalTransform`
 pub fn get_camera<'a>(
-    active: Option<Read<'a, ActiveCamera>>,
+    active: Read<'a, ActiveCamera>,
     camera: &'a ReadStorage<'a, Camera>,
     global: &'a ReadStorage<'a, GlobalTransform>,
 ) -> Option<(&'a Camera, &'a GlobalTransform)> {
+    #[cfg(feature = "profiler")]
+    profile_scope!("render_getcamera");
+
     active
-        .and_then(|a| {
-            let cam = camera.get(a.entity);
-            let transform = global.get(a.entity);
+        .entity
+        .and_then(|entity| {
+            let cam = camera.get(entity);
+            let transform = global.get(entity);
             cam.into_iter().zip(transform.into_iter()).next()
         })
         .or_else(|| (camera, global).join().next())
+}
+
+pub fn default_transparency() -> Option<(ColorMask, Blend, Option<DepthMode>)> {
+    Some((
+        ColorMask::all(),
+        crate::ALPHA,
+        Some(DepthMode::LessEqualWrite),
+    ))
 }
