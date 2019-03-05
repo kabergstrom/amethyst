@@ -1,15 +1,13 @@
 //! Demonstrates loading custom assets using the Amethyst engine.
 // TODO: Add asset loader directory store for the meshes.
 
-extern crate amethyst;
-extern crate rayon;
-
 use amethyst::{
-    assets::{Loader, Result as AssetResult, SimpleFormat},
+    assets::{Loader, SimpleFormat},
     core::{
-        cgmath::{Array, Deg, Vector3},
+        nalgebra::{Vector2, Vector3},
         Transform, TransformBundle,
     },
+    error::Error,
     input::InputBundle,
     prelude::*,
     renderer::{
@@ -17,19 +15,18 @@ use amethyst::{
         PosNormTex, Projection, Rgba,
     },
     utils::application_root_dir,
-    Error,
 };
 
 #[derive(Clone)]
 struct Custom;
 
 impl SimpleFormat<Mesh> for Custom {
-    const NAME: &'static str = "CUSTOM";
-
     type Options = ();
 
+    fn name() -> &'static str { "CUSTOM" }
+
     /// Reads the given bytes and produces asset data.
-    fn import(&self, bytes: Vec<u8>, _: ()) -> AssetResult<MeshData> {
+    fn import(&self, bytes: Vec<u8>, _: ()) -> Result<MeshData, Error> {
         let data: String = String::from_utf8(bytes)?;
 
         let trimmed: Vec<&str> = data.lines().filter(|line| line.len() >= 1).collect();
@@ -39,22 +36,22 @@ impl SimpleFormat<Mesh> for Custom {
         for line in trimmed {
             let nums: Vec<&str> = line.split_whitespace().collect();
 
-            let position = [
+            let position = Vector3::new(
                 nums[0].parse::<f32>().unwrap(),
                 nums[1].parse::<f32>().unwrap(),
                 nums[2].parse::<f32>().unwrap(),
-            ];
+            );
 
-            let normal = [
+            let normal = Vector3::new(
                 nums[3].parse::<f32>().unwrap(),
                 nums[4].parse::<f32>().unwrap(),
                 nums[5].parse::<f32>().unwrap(),
-            ];
+            );
 
             result.push(PosNormTex {
                 position,
                 normal,
-                tex_coord: [0.0, 0.0],
+                tex_coord: Vector2::new(0.0, 0.0),
             });
         }
         Ok(result.into())
@@ -63,8 +60,8 @@ impl SimpleFormat<Mesh> for Custom {
 
 struct AssetsExample;
 
-impl<'a, 'b> SimpleState<'a, 'b> for AssetsExample {
-    fn on_start(&mut self, data: StateData<GameData>) {
+impl SimpleState for AssetsExample {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let StateData { world, .. } = data;
         world.add_resource(0usize);
 
@@ -90,8 +87,8 @@ impl<'a, 'b> SimpleState<'a, 'b> for AssetsExample {
         };
 
         let mut trans = Transform::default();
-        trans.translation = Vector3::new(-5.0, 0.0, 0.0);
-        trans.scale = Vector3::from_value(2.);
+        trans.set_xyz(-5.0, 0.0, 0.0);
+        trans.set_scale(2.0, 2.0, 2.0);
         world
             .create_entity()
             .with(mesh)
@@ -104,15 +101,13 @@ impl<'a, 'b> SimpleState<'a, 'b> for AssetsExample {
 fn main() -> Result<(), Error> {
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir();
+    let app_root = application_root_dir()?;
 
     // Add our meshes directory to the asset loader.
-    let resources_directory = format!("{}/examples/assets", app_root);
+    let resources_directory = app_root.join("examples/assets");
 
-    let display_config_path = format!(
-        "{}/examples/asset_loading/resources/display_config.ron",
-        app_root
-    );
+    let display_config_path =
+        app_root.join("{}/examples/asset_loading/resources/display_config.ron");
 
     let game_data = GameDataBuilder::default()
         .with_bundle(InputBundle::<String, String>::new())?
@@ -126,12 +121,15 @@ fn main() -> Result<(), Error> {
 
 fn initialise_camera(world: &mut World) {
     let mut transform = Transform::default();
-    transform.set_position(Vector3::new(0.0, -20.0, 10.0));
-    transform.set_rotation(Deg(75.96), Deg(0.0), Deg(0.0));
+    transform.set_xyz(0.0, -20.0, 10.0);
+    transform.rotate_local(Vector3::x_axis(), 1.3257521);
 
     world
         .create_entity()
-        .with(Camera::from(Projection::perspective(1.0, Deg(60.0))))
+        .with(Camera::from(Projection::perspective(
+            1.0,
+            std::f32::consts::FRAC_PI_3,
+        )))
         .with(transform)
         .build();
 }
@@ -143,10 +141,11 @@ fn initialise_lights(world: &mut World) {
         radius: 1.0,
         color: Rgba::white(),
         ..Default::default()
-    }.into();
+    }
+    .into();
 
     let mut transform = Transform::default();
-    transform.set_position(Vector3::new(5.0, -20.0, 15.0));
+    transform.set_xyz(5.0, -20.0, 15.0);
 
     // Add point light.
     world.create_entity().with(light).with(transform).build();

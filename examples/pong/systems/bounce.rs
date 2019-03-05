@@ -1,12 +1,14 @@
+use crate::{
+    audio::{play_bounce, Sounds},
+    Ball, Paddle, Side,
+};
 use amethyst::{
     assets::AssetStorage,
     audio::{output::Output, Source},
     core::transform::Transform,
     ecs::prelude::{Join, Read, ReadExpect, ReadStorage, System, WriteStorage},
 };
-use audio::{play_bounce, Sounds};
 use std::ops::Deref;
-use {Ball, Paddle, Side};
 
 /// This system is responsible for detecting collisions between balls and
 /// paddles, as well as balls and the top and bottom edges of the arena.
@@ -31,24 +33,23 @@ impl<'s> System<'s> for BounceSystem {
         // We also check for the velocity of the ball every time, to prevent multiple collisions
         // from occurring.
         for (ball, transform) in (&mut balls, &transforms).join() {
-            use ARENA_HEIGHT;
+            use crate::ARENA_HEIGHT;
 
-            let ball_x = transform.translation[0];
-            let ball_y = transform.translation[1];
+            let ball_x = transform.translation().x;
+            let ball_y = transform.translation().y;
 
             // Bounce at the top or the bottom of the arena.
-            if ball_y <= ball.radius && ball.velocity[1] < 0.0 {
-                ball.velocity[1] = -ball.velocity[1];
-                play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
-            } else if ball_y >= ARENA_HEIGHT - ball.radius && ball.velocity[1] > 0.0 {
+            if (ball_y <= ball.radius && ball.velocity[1] < 0.0)
+                || (ball_y >= ARENA_HEIGHT - ball.radius && ball.velocity[1] > 0.0)
+            {
                 ball.velocity[1] = -ball.velocity[1];
                 play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
             }
 
             // Bounce at the paddles.
             for (paddle, paddle_transform) in (&paddles, &transforms).join() {
-                let paddle_x = paddle_transform.translation[0] - paddle.width * 0.5;
-                let paddle_y = paddle_transform.translation[1] - paddle.height * 0.5;
+                let paddle_x = paddle_transform.translation().x - paddle.width * 0.5;
+                let paddle_y = paddle_transform.translation().y - paddle.height * 0.5;
 
                 // To determine whether the ball has collided with a paddle, we create a larger
                 // rectangle around the current one, by subtracting the ball radius from the
@@ -63,10 +64,9 @@ impl<'s> System<'s> for BounceSystem {
                     paddle_x + paddle.width + ball.radius,
                     paddle_y + paddle.height + ball.radius,
                 ) {
-                    if paddle.side == Side::Left && ball.velocity[0] < 0.0 {
-                        ball.velocity[0] = -ball.velocity[0];
-                        play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
-                    } else if paddle.side == Side::Right && ball.velocity[0] > 0.0 {
+                    if (paddle.side == Side::Left && ball.velocity[0] < 0.0)
+                        || (paddle.side == Side::Right && ball.velocity[0] > 0.0)
+                    {
                         ball.velocity[0] = -ball.velocity[0];
                         play_bounce(&*sounds, &storage, audio_output.as_ref().map(|o| o.deref()));
                     }

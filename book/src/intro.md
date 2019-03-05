@@ -1,5 +1,5 @@
 <div style="display:inline-block;width:100%">
-    <img src="./images/amethyst_thumb.png" alt="Logo" width="96px" style="float:left;margin-right:15px"/>
+    <img src="./images/amethyst_emblem.png" alt="Logo" width="96px" style="float:left;margin-right:15px"/>
     <h1>The Amethyst Engine</h1>
 </div>
 
@@ -30,6 +30,7 @@ This book is split into several sections, with this introduction being the first
 * [Getting Started][gs] – Prepare your computer for Amethyst development.
 * [Concepts][cc] – An overview of the concepts used in Amethyst. Recommended.
 * [Pong Tutorial][pt] – Build a basic pong game in Rust.
+* [Math][math] – A quick introduction to doing math with Amethyst.
 * [Animation][anim] – Explains the architecture of the `amethyst_animation` crate.
 * [Custom `GameData`][gad] – Shows you how to structure more complex games that need to change the system graph.
 * [Glossary][gl] – Defines special terms used throughout the book.
@@ -38,6 +39,7 @@ This book is split into several sections, with this introduction being the first
 [gs]: ./getting-started.html
 [cc]: ./concepts/intro.html
 [pt]: ./pong-tutorial.html
+[math]: ./math.html
 [anim]: ./animation.html
 [gad]: ./game-data.html
 [gl]: ./glossary.html
@@ -45,7 +47,7 @@ This book is split into several sections, with this introduction being the first
 
 Read the crate-level [API documentation][ad] for more details.
 
-[ad]: https://www.amethyst.rs/doc/master/doc/amethyst/index.html
+[ad]: https://www.amethyst.rs/doc/latest/doc/amethyst/index.html
 
 [db]: https://github.com/amethyst/amethyst/
 
@@ -85,7 +87,7 @@ Those principles are:
 
 While there are a lot of [great building blocks][awg] in the Rust ecosystem, using the Amethyst engine instead of building your own game engine definitely has a lot of advantages.
 
-First of all, the engine is based on the [Specs][specs] library, which is a common base on which the engine's concepts are built. Those are described in the [concepts](./concepts/intro.md) section of the book.
+First of all, the engine is based on the [Specs][specs] library, which is a common base on which the engine's concepts are built. For a great introduction to game development with Rust and an Entity Component System, see this [great talk by Catherine West](https://kyren.github.io/2018/09/14/rustconf-talk.html). Amethyst's take on ECS is described in the [concepts](./concepts/intro.md) section of the book.
 A lot of features have been glued together using those:
 
 There are the obvious ones:
@@ -121,4 +123,4 @@ To know where to start, we suggest you read our [contribution guidelines](https:
 
 If you want to contribute, or have questions, let us know either on [GitHub][db], or on [Discord][di].
 
-[di]: https://discord.gg/GnP5Whs
+[di]: https://discord.gg/amethyst

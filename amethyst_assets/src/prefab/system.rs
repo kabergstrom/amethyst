@@ -1,14 +1,17 @@
 use std::{marker::PhantomData, ops::Deref};
 
+use log::error;
+
 use amethyst_core::{
     specs::{
-        BitSet, Entities, Entity, InsertedFlag, Join, Read, ReadExpect, ReadStorage, ReaderId,
-        Resources, System, Write, WriteStorage,
+        storage::ComponentEvent, BitSet, Entities, Entity, Join, Read, ReadExpect, ReadStorage,
+        ReaderId, Resources, System, Write, WriteStorage,
     },
     ArcThreadPool, Parent, Time,
 };
+use amethyst_error::{format_err, Error, ResultExt};
 
-use {AssetStorage, Completion, Handle, HotReloadStrategy, ProcessingState, ResultExt};
+use crate::{AssetStorage, Completion, Handle, HotReloadStrategy, ProcessingState};
 
 use super::{Prefab, PrefabData, PrefabTag};
 
@@ -22,7 +25,7 @@ pub struct PrefabLoaderSystem<T> {
     entities: Vec<Entity>,
     finished: Vec<Entity>,
     to_process: BitSet,
-    insert_reader: Option<ReaderId<InsertedFlag>>,
+    insert_reader: Option<ReaderId<ComponentEvent>>,
     next_tag: u64,
 }
 
@@ -75,7 +78,7 @@ where
                 if !d.loading() {
                     if !d
                         .load_sub_assets(&mut prefab_system_data)
-                        .chain_err(|| "Failed starting sub asset loading")?
+                        .with_context(|_| format_err!("Failed starting sub asset loading"))?
                     {
                         return Ok(ProcessingState::Loaded(d));
                     }
@@ -84,7 +87,7 @@ where
                     Completion::Complete => Ok(ProcessingState::Loaded(d)),
                     Completion::Failed => {
                         error!("Failed loading sub asset: {:?}", d.progress().errors());
-                        Err("Failed loading sub asset")?
+                        return Err(Error::from_string("Failed loading sub asset"));
                     }
                     Completion::Loading => Ok(ProcessingState::Loading(d)),
                 }
@@ -94,7 +97,15 @@ where
             strategy,
         );
         prefab_handles
-            .populate_inserted(self.insert_reader.as_mut().unwrap(), &mut self.to_process);
+            .channel()
+            .read(self.insert_reader.as_mut().expect(
+                "`PrefabLoaderSystem::setup` was not called before `PrefabLoaderSystem::run`",
+            ))
+            .for_each(|event| {
+                if let ComponentEvent::Inserted(id) = event {
+                    self.to_process.add(*id);
+                }
+            });
         self.finished.clear();
         for (root_entity, handle, _) in (&*entities, &prefab_handles, &self.to_process).join() {
             if let Some(prefab) = prefab_storage.get(handle) {
@@ -112,10 +123,18 @@ where
                                 Parent {
                                     entity: self.entities[parent],
                                 },
-                            ).unwrap();
+                            )
+                            .expect("Unable to insert `Parent` for prefab");
                     }
-                    tags.insert(new_entity, PrefabTag::new(prefab.tag.unwrap()))
-                        .unwrap();
+                    tags.insert(
+                        new_entity,
+                        PrefabTag::new(
+                            prefab.tag.expect(
+                                "Unreachable: Every loaded prefab should have a `PrefabTag`",
+                            ),
+                        ),
+                    )
+                    .expect("Unable to insert `PrefabTag` for prefab entity");
                 }
                 // create components
                 for (index, entity_data) in prefab.entities.iter().enumerate() {
@@ -125,7 +144,8 @@ where
                                 self.entities[index],
                                 &mut prefab_system_data,
                                 &self.entities,
-                            ).unwrap();
+                            )
+                            .expect("Unable to add prefab system data to entity");
                     }
                 }
             }
@@ -139,6 +159,6 @@ where
     fn setup(&mut self, res: &mut Resources) {
         use amethyst_core::specs::prelude::SystemData;
         Self::SystemData::setup(res);
-        self.insert_reader = Some(WriteStorage::<Handle<Prefab<T>>>::fetch(&res).track_inserted());
+        self.insert_reader = Some(WriteStorage::<Handle<Prefab<T>>>::fetch(&res).register_reader());
     }
 }

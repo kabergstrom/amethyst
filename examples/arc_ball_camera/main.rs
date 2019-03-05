@@ -1,7 +1,5 @@
 //! Demonstrates how to use the fly camera
 
-extern crate amethyst;
-
 use amethyst::{
     assets::{PrefabLoader, PrefabLoaderSystem, RonFormat},
     controls::{ArcBallControlBundle, ArcBallControlTag},
@@ -12,7 +10,7 @@ use amethyst::{
     ecs::prelude::{Join, Read, ReadStorage, Resources, System, SystemData, WriteStorage},
     input::{InputBundle, InputEvent, ScrollDirection},
     prelude::*,
-    renderer::{DrawShaded, PosNormTex},
+    renderer::{DisplayConfig, DrawShaded, DrawSkybox, Pipeline, PosNormTex, RenderBundle, Stage},
     utils::{application_root_dir, scene::BasicScenePrefab},
     Error,
 };
@@ -22,9 +20,9 @@ type MyPrefabData = BasicScenePrefab<Vec<PosNormTex>>;
 
 struct ExampleState;
 
-impl<'a, 'b> SimpleState<'a, 'b> for ExampleState {
-    fn on_start(&mut self, data: StateData<GameData>) {
-        let prefab_handle = data.world.exec(|loader: PrefabLoader<MyPrefabData>| {
+impl SimpleState for ExampleState {
+    fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
+        let prefab_handle = data.world.exec(|loader: PrefabLoader<'_, MyPrefabData>| {
             loader.load("prefab/arc_ball_camera.ron", RonFormat, (), ())
         });
         data.world.create_entity().with(prefab_handle).build();
@@ -91,28 +89,39 @@ where
 fn main() -> Result<(), Error> {
     amethyst::start_logger(Default::default());
 
-    let app_root = application_root_dir();
+    let app_root = application_root_dir()?;
 
-    let resources_directory = format!("{}/examples/assets", app_root);
+    let resources_directory = app_root.join("examples/assets");
 
-    let display_config_path = format!(
-        "{}/examples/arc_ball_camera/resources/display_config.ron",
-        app_root
-    );
+    let key_bindings_path = app_root.join("examples/arc_ball_camera/resources/input.ron");
 
-    let key_bindings_path = format!("{}/examples/arc_ball_camera/resources/input.ron", app_root);
+    let render_bundle = {
+        let display_config = {
+            let path = app_root.join("examples/arc_ball_camera/resources/display_config.ron");
+            DisplayConfig::load(&path)
+        };
+        let pipe = Pipeline::build().with_stage(
+            Stage::with_backbuffer()
+                .clear_target([0.0, 0.0, 0.0, 1.0], 1.0)
+                .with_pass(DrawShaded::<PosNormTex>::new())
+                .with_pass(DrawSkybox::new()),
+        );
+        RenderBundle::new(pipe, Some(display_config))
+    };
 
     let game_data = GameDataBuilder::default()
         .with(PrefabLoaderSystem::<MyPrefabData>::default(), "", &[])
         .with_bundle(TransformBundle::new().with_dep(&[]))?
         .with_bundle(
             InputBundle::<String, String>::new().with_bindings_from_file(&key_bindings_path)?,
-        )?.with_bundle(ArcBallControlBundle::<String, String>::new())?
+        )?
+        .with_bundle(ArcBallControlBundle::<String, String>::new())?
+        .with_bundle(render_bundle)?
         .with(
             CameraDistanceSystem::<String>::new(),
             "camera_distance_system",
             &["input_system"],
-        ).with_basic_renderer(display_config_path, DrawShaded::<PosNormTex>::new(), false)?;
+        );
     let mut game = Application::build(resources_directory, ExampleState)?.build(game_data)?;
     game.run();
     Ok(())

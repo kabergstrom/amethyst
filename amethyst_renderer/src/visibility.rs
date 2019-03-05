@@ -3,12 +3,12 @@ use std::cmp::Ordering;
 use hibitset::BitSet;
 
 use amethyst_core::{
-    cgmath::{EuclideanSpace, InnerSpace, MetricSpace, Point3, Transform, Vector3},
+    nalgebra::{self as na, Point3, Vector3},
     specs::prelude::{Entities, Entity, Join, Read, ReadStorage, System, Write},
     GlobalTransform,
 };
 
-use {
+use crate::{
     cam::{ActiveCamera, Camera},
     hidden::{Hidden, HiddenPropagate},
     transparent::Transparent,
@@ -59,7 +59,7 @@ impl<'a> System<'a> for VisibilitySortingSystem {
         Write<'a, Visibility>,
         ReadStorage<'a, Hidden>,
         ReadStorage<'a, HiddenPropagate>,
-        Option<Read<'a, ActiveCamera>>,
+        Read<'a, ActiveCamera>,
         ReadStorage<'a, Camera>,
         ReadStorage<'a, Transparent>,
         ReadStorage<'a, GlobalTransform>,
@@ -68,31 +68,33 @@ impl<'a> System<'a> for VisibilitySortingSystem {
     fn run(
         &mut self,
         (entities, mut visibility, hidden, hidden_prop, active, camera, transparent, global): Self::SystemData,
-){
+    ) {
         let origin = Point3::origin();
 
         let camera: Option<&GlobalTransform> = active
-            .and_then(|a| global.get(a.entity))
+            .entity
+            .and_then(|entity| global.get(entity))
             .or_else(|| (&camera, &global).join().map(|cg| cg.1).next());
         let camera_backward = camera
-            .map(|c| c.0.z.truncate())
-            .unwrap_or_else(Vector3::unit_z);
+            .map(|c| c.0.column(2).xyz())
+            .unwrap_or_else(Vector3::z);
         let camera_centroid = camera
-            .map(|g| g.0.transform_point(origin))
+            .map(|g| g.0.transform_point(&origin))
             .unwrap_or(origin);
 
         self.centroids.clear();
         self.centroids.extend(
             (&*entities, &global, !&hidden, !&hidden_prop)
                 .join()
-                .map(|(entity, global, _, _)| (entity, global.0.transform_point(origin)))
+                .map(|(entity, global, _, _)| (entity, global.0.transform_point(&origin)))
                 .map(|(entity, centroid)| Internals {
                     entity,
                     transparent: transparent.contains(entity),
                     centroid,
-                    camera_distance: centroid.distance2(camera_centroid),
+                    camera_distance: na::distance_squared(&centroid, &camera_centroid),
                     from_camera: centroid - camera_centroid,
-                }).filter(|c| c.from_camera.dot(camera_backward) < 0.), // filter entities behind the camera
+                })
+                .filter(|c| c.from_camera.dot(&camera_backward) < 0.), // filter entities behind the camera
         );
         self.transparent.clear();
         self.transparent

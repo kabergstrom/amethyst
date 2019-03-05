@@ -7,7 +7,9 @@ use std::{
 };
 
 use crossbeam::queue::MsQueue;
+use derivative::Derivative;
 use hibitset::BitSet;
+use log::{debug, error, trace, warn};
 use rayon::ThreadPool;
 
 use amethyst_core::{
@@ -17,10 +19,11 @@ use amethyst_core::{
     },
     Time,
 };
+use amethyst_error::{Error, ResultExt};
 
-use {
+use crate::{
     asset::{Asset, FormatValue},
-    error::{Error, ErrorKind, Result, ResultExt},
+    error,
     progress::Tracker,
     reload::{HotReloadStrategy, Reload},
 };
@@ -46,7 +49,7 @@ pub struct AssetStorage<A: Asset> {
     handles: Vec<Handle<A>>,
     handle_alloc: Allocator,
     pub(crate) processed: Arc<MsQueue<Processed<A>>>,
-    reloads: Vec<(WeakHandle<A>, Box<Reload<A>>)>,
+    reloads: Vec<(WeakHandle<A>, Box<dyn Reload<A>>)>,
     unused_handles: MsQueue<Handle<A>>,
     requeue: Mutex<Vec<Processed<A>>>,
 }
@@ -135,7 +138,7 @@ impl<A: Asset> AssetStorage<A> {
         pool: &ThreadPool,
         strategy: Option<&HotReloadStrategy>,
     ) where
-        F: FnMut(A::Data) -> Result<ProcessingState<A>>,
+        F: FnMut(A::Data) -> Result<ProcessingState<A>, Error>,
     {
         self.process_custom_drop(f, |_| {}, frame_number, pool, strategy);
     }
@@ -151,10 +154,13 @@ impl<A: Asset> AssetStorage<A> {
         strategy: Option<&HotReloadStrategy>,
     ) where
         D: FnMut(A),
-        F: FnMut(A::Data) -> Result<ProcessingState<A>>,
+        F: FnMut(A::Data) -> Result<ProcessingState<A>, Error>,
     {
         {
-            let requeue = self.requeue.get_mut().unwrap();
+            let requeue = self
+                .requeue
+                .get_mut()
+                .expect("The mutex of `requeue` in `AssetStorage` was poisoned");
             while let Some(processed) = self.processed.try_pop() {
                 let assets = &mut self.assets;
                 let bitset = &mut self.bitset;
@@ -172,12 +178,12 @@ impl<A: Asset> AssetStorage<A> {
                         let (asset, reload_obj) = match data
                             .map(|FormatValue { data, reload }| (data, reload))
                             .and_then(|(d, rel)| f(d).map(|a| (a, rel)))
-                            .chain_err(|| ErrorKind::Asset(name.clone()))
+                            .with_context(|_| error::Error::Asset(name.clone()))
                         {
                             Ok((ProcessingState::Loaded(x), r)) => {
                                 debug!(
                                         "{:?}: Asset {:?} (handle id: {:?}) has been loaded successfully",
-                                        A::NAME,
+                                        A::name(),
                                         name,
                                         handle,
                                     );
@@ -191,9 +197,9 @@ impl<A: Asset> AssetStorage<A> {
                                     );
                                     tracker.fail(
                                         handle.id(),
-                                        A::NAME,
+                                        A::name(),
                                         name,
-                                        Error::from_kind(ErrorKind::UnusedHandle),
+                                        Error::from(error::Error::UnusedHandle),
                                     );
                                 } else {
                                     tracker.success();
@@ -204,7 +210,7 @@ impl<A: Asset> AssetStorage<A> {
                             Ok((ProcessingState::Loading(x), r)) => {
                                 debug!(
                                         "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
-                                        A::NAME,
+                                        A::name(),
                                         name,
                                         handle,
                                     );
@@ -219,12 +225,12 @@ impl<A: Asset> AssetStorage<A> {
                             Err(e) => {
                                 error!(
                                     "{:?}: Asset {:?} (handle id: {:?}) could not be loaded: {}",
-                                    A::NAME,
+                                    A::name(),
                                     name,
                                     handle,
                                     e,
                                 );
-                                tracker.fail(handle.id(), A::NAME, name, e);
+                                tracker.fail(handle.id(), A::name(), name, e);
 
                                 continue;
                             }
@@ -251,13 +257,13 @@ impl<A: Asset> AssetStorage<A> {
                         let (asset, reload_obj) = match data
                             .map(|FormatValue { data, reload }| (data, reload))
                             .and_then(|(d, rel)| f(d).map(|a| (a, rel)))
-                            .chain_err(|| ErrorKind::Asset(name.clone()))
+                            .with_context(|_| error::Error::Asset(name.clone()))
                         {
                             Ok((ProcessingState::Loaded(x), r)) => (x, r),
                             Ok((ProcessingState::Loading(x), r)) => {
                                 debug!(
                                     "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
-                                    A::NAME,
+                                    A::name(),
                                     name,
                                     handle,
                                 );
@@ -273,7 +279,7 @@ impl<A: Asset> AssetStorage<A> {
                                 error!(
                                     "{:?}: Failed to hot-reload asset {:?} (handle id: {:?}): {}\n\
                                      Falling back to old reload object.",
-                                    A::NAME,
+                                    A::name(),
                                     name,
                                     handle,
                                     e,
@@ -333,14 +339,14 @@ impl<A: Asset> AssetStorage<A> {
             });
         }
         if count != 0 {
-            debug!("{:?}: Freed {} handle ids", A::NAME, count,);
+            debug!("{:?}: Freed {} handle ids", A::name(), count,);
         }
 
         if strategy
             .map(|s| s.needs_reload(frame_number))
             .unwrap_or(false)
         {
-            trace!("{:?}: Testing for asset reloads..", A::NAME);
+            trace!("{:?}: Testing for asset reloads..", A::name());
             self.hot_reload(pool);
         }
     }
@@ -352,7 +358,7 @@ impl<A: Asset> AssetStorage<A> {
             .iter()
             .position(|&(_, ref rel)| rel.needs_reload())
         {
-            let (handle, rel): (WeakHandle<_>, Box<Reload<_>>) = self.reloads.swap_remove(p);
+            let (handle, rel): (WeakHandle<_>, Box<dyn Reload<_>>) = self.reloads.swap_remove(p);
 
             let name = rel.name();
             let format = rel.format();
@@ -360,7 +366,7 @@ impl<A: Asset> AssetStorage<A> {
 
             debug!(
                 "{:?}: Asset {:?} (handle id: {:?}) needs a reload using format {:?}",
-                A::NAME,
+                A::name(),
                 name,
                 handle,
                 format,
@@ -370,7 +376,7 @@ impl<A: Asset> AssetStorage<A> {
                 let processed = self.processed.clone();
                 pool.spawn(move || {
                     let old_reload = rel.clone();
-                    let data = rel.reload().chain_err(|| ErrorKind::Format(format));
+                    let data = rel.reload().with_context(|_| error::Error::Format(format));
 
                     let p = Processed::HotReload {
                         data,
@@ -430,7 +436,7 @@ impl<A> Processor<A> {
 impl<'a, A> System<'a> for Processor<A>
 where
     A: Asset,
-    A::Data: Into<Result<ProcessingState<A>>>,
+    A::Data: Into<Result<ProcessingState<A>, Error>>,
 {
     type SystemData = (
         Write<'a, AssetStorage<A>>,
@@ -499,16 +505,16 @@ where
 
 pub(crate) enum Processed<A: Asset> {
     NewAsset {
-        data: Result<FormatValue<A>>,
+        data: Result<FormatValue<A>, Error>,
         handle: Handle<A>,
         name: String,
-        tracker: Box<Tracker>,
+        tracker: Box<dyn Tracker>,
     },
     HotReload {
-        data: Result<FormatValue<A>>,
+        data: Result<FormatValue<A>, Error>,
         handle: Handle<A>,
         name: String,
-        old_reload: Box<Reload<A>>,
+        old_reload: Box<dyn Reload<A>>,
     },
 }
 

@@ -1,4 +1,5 @@
 use proc_macro2::TokenStream;
+use quote::quote;
 use syn::{Data, DeriveInput, Ident, Meta, NestedMeta, Type};
 
 pub fn impl_event_reader(ast: &DeriveInput) -> TokenStream {
@@ -12,7 +13,8 @@ pub fn impl_event_reader(ast: &DeriveInput) -> TokenStream {
         .map(|attr| {
             attr.interpret_meta()
                 .expect("reader attribute incorrectly defined")
-        }) {
+        })
+    {
         match meta {
             Meta::List(l) => {
                 for nested_meta in l.nested.iter() {
@@ -28,8 +30,9 @@ pub fn impl_event_reader(ast: &DeriveInput) -> TokenStream {
         };
     }
 
-    let reader_name = reader_name.expect(&format!(
-        r#"
+    let reader_name = reader_name.unwrap_or_else(|| {
+        panic!(
+            r#"
 #[derive(EventReader)] requested for {}, but #[reader(SomeEventReader)] attribute is missing
 
 Example usage:
@@ -40,8 +43,9 @@ pub enum SomeEvent {{
     Two(Event2),
 }}
 "#,
-        event_name
-    ));
+            event_name
+        )
+    });
 
     let tys = collect_field_types(&ast.data);
     let tys = &tys;
@@ -51,7 +55,7 @@ pub enum SomeEvent {{
     let reads : Vec<_> = (0..tys.len()).map(|n| {
         let variant = &names[n];
         quote! {
-            events.extend(data.#n.read(self.#n.as_mut().expect("ReaderId undefined, has setup been run?")).cloned().map(|e| #event_name::#variant(e)));
+            events.extend(data.#n.read(self.#n.as_mut().expect("ReaderId undefined, has setup been run?")).cloned().map(#event_name::#variant));
         }
     }).collect();
     let setups: Vec<_> = (0..tys.len())
@@ -60,7 +64,8 @@ pub enum SomeEvent {{
             quote! {
                 self.#n = Some(res.fetch_mut::<EventChannel<#ty>>().register_reader());
             }
-        }).collect();
+        })
+        .collect();
     quote! {
         #[allow(missing_docs)]
         #[derive(Default)]
@@ -100,7 +105,8 @@ fn collect_field_types(ast: &Data) -> Vec<Type> {
                 .expect("Event enum variant does not contain an inner event type")
                 .ty
                 .clone()
-        }).collect()
+        })
+        .collect()
 }
 
 fn collect_variant_names(ast: &Data) -> Vec<Ident> {

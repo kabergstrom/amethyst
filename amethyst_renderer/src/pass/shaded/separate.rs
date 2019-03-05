@@ -1,17 +1,19 @@
 //! Simple shaded pass
 
+use derivative::Derivative;
 use gfx::pso::buffer::ElemStride;
 use gfx_core::state::{Blend, ColorMask};
+use log::{debug, trace};
 
 use amethyst_assets::AssetStorage;
 use amethyst_core::{
     specs::prelude::{Join, Read, ReadExpect, ReadStorage},
     transform::GlobalTransform,
 };
+use amethyst_error::Error;
 
-use {
+use crate::{
     cam::{ActiveCamera, Camera},
-    error::Result,
     hidden::{Hidden, HiddenPropagate},
     light::Light,
     mesh::{Mesh, MeshHandle},
@@ -19,7 +21,7 @@ use {
     pass::{
         shaded_util::{set_light_args, setup_light_buffers},
         skinning::{create_skinning_effect, setup_skinning_buffers},
-        util::{draw_mesh, get_camera, setup_textures, setup_vertex_args},
+        util::{default_transparency, draw_mesh, get_camera, setup_textures, setup_vertex_args},
     },
     pipe::{
         pass::{Pass, PassData},
@@ -31,6 +33,7 @@ use {
     types::{Encoder, Factory},
     vertex::{Attributes, Normal, Position, Separate, TexCoord, VertexFormat},
     visibility::Visibility,
+    Rgba,
 };
 
 use super::*;
@@ -45,9 +48,11 @@ static ATTRIBUTES: [Attributes<'static>; 3] = [
 ///
 /// See the [crate level documentation](index.html) for information about interleaved and separate
 /// passes.
-#[derive(Default, Clone, Debug, PartialEq)]
+#[derive(Derivative, Clone, Debug, PartialEq)]
+#[derivative(Default)]
 pub struct DrawShadedSeparate {
     skinning: bool,
+    #[derivative(Default(value = "default_transparency()"))]
     transparency: Option<(ColorMask, Blend, Option<DepthMode>)>,
 }
 
@@ -63,8 +68,24 @@ impl DrawShadedSeparate {
         self
     }
 
-    /// Enable transparency
-    pub fn with_transparency(
+    /// Transparency is enabled by default.
+    /// If you pass false to this function transparency will be disabled.
+    ///
+    /// If you pass true and this was disabled previously default settings will be reinstated.
+    /// If you pass true and this was already enabled this will do nothing.
+    pub fn with_transparency(mut self, input: bool) -> Self {
+        if input {
+            if self.transparency.is_none() {
+                self.transparency = default_transparency();
+            }
+        } else {
+            self.transparency = None;
+        }
+        self
+    }
+
+    /// Set transparency settings to custom values.
+    pub fn with_transparency_settings(
         mut self,
         mask: ColorMask,
         blend: Blend,
@@ -77,7 +98,7 @@ impl DrawShadedSeparate {
 
 impl<'a> PassData<'a> for DrawShadedSeparate {
     type Data = (
-        Option<Read<'a, ActiveCamera>>,
+        Read<'a, ActiveCamera>,
         ReadStorage<'a, Camera>,
         Read<'a, AmbientColor>,
         Read<'a, AssetStorage<Mesh>>,
@@ -91,11 +112,12 @@ impl<'a> PassData<'a> for DrawShadedSeparate {
         ReadStorage<'a, GlobalTransform>,
         ReadStorage<'a, Light>,
         ReadStorage<'a, JointTransforms>,
+        ReadStorage<'a, Rgba>,
     );
 }
 
 impl Pass for DrawShadedSeparate {
-    fn compile(&mut self, effect: NewEffect) -> Result<Effect> {
+    fn compile(&mut self, effect: NewEffect<'_>) -> Result<Effect, Error> {
         debug!("Building shaded pass");
         let mut builder = if self.skinning {
             create_skinning_effect(effect, FRAG_SRC)
@@ -108,11 +130,13 @@ impl Pass for DrawShadedSeparate {
                 Separate::<Position>::ATTRIBUTES,
                 Separate::<Position>::size() as ElemStride,
                 0,
-            ).with_raw_vertex_buffer(
+            )
+            .with_raw_vertex_buffer(
                 Separate::<Normal>::ATTRIBUTES,
                 Separate::<Normal>::size() as ElemStride,
                 0,
-            ).with_raw_vertex_buffer(
+            )
+            .with_raw_vertex_buffer(
                 Separate::<TexCoord>::ATTRIBUTES,
                 Separate::<TexCoord>::size() as ElemStride,
                 0,
@@ -150,6 +174,7 @@ impl Pass for DrawShadedSeparate {
             global,
             light,
             joints,
+            rgba,
         ): <Self as PassData<'a>>::Data,
     ) {
         trace!("Drawing shaded pass");
@@ -159,11 +184,12 @@ impl Pass for DrawShadedSeparate {
 
         match visibility {
             None => {
-                for (joint, mesh, material, global, _, _) in (
+                for (joint, mesh, material, global, rgba, _, _) in (
                     joints.maybe(),
                     &mesh,
                     &material,
                     &global,
+                    rgba.maybe(),
                     !&hidden,
                     !&hidden_prop,
                 )
@@ -178,6 +204,7 @@ impl Pass for DrawShadedSeparate {
                         &tex_storage,
                         Some(material),
                         &material_defaults,
+                        rgba,
                         camera,
                         Some(global),
                         &ATTRIBUTES,
@@ -186,11 +213,12 @@ impl Pass for DrawShadedSeparate {
                 }
             }
             Some(ref visibility) => {
-                for (joint, mesh, material, global, _) in (
+                for (joint, mesh, material, global, rgba, _) in (
                     joints.maybe(),
                     &mesh,
                     &material,
                     &global,
+                    rgba.maybe(),
                     &visibility.visible_unordered,
                 )
                     .join()
@@ -204,6 +232,7 @@ impl Pass for DrawShadedSeparate {
                         &tex_storage,
                         Some(material),
                         &material_defaults,
+                        rgba,
                         camera,
                         Some(global),
                         &ATTRIBUTES,
@@ -222,6 +251,7 @@ impl Pass for DrawShadedSeparate {
                             &tex_storage,
                             material.get(*entity),
                             &material_defaults,
+                            rgba.get(*entity),
                             camera,
                             global.get(*entity),
                             &ATTRIBUTES,

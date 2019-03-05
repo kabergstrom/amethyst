@@ -1,10 +1,9 @@
+use crate::Paddle;
 use amethyst::{
-    core::timing::Time,
-    core::transform::Transform,
+    core::{timing::Time, transform::Transform},
     ecs::prelude::{Join, Read, ReadStorage, System, WriteStorage},
     input::InputHandler,
 };
-use Paddle;
 
 /// This system is responsible for moving all the paddles according to the user
 /// provided input.
@@ -19,7 +18,7 @@ impl<'s> System<'s> for PaddleSystem {
     );
 
     fn run(&mut self, (paddles, mut transforms, time, input): Self::SystemData) {
-        use Side;
+        use crate::Side;
 
         // Iterate over all planks and move them according to the input the user
         // provided.
@@ -30,14 +29,16 @@ impl<'s> System<'s> for PaddleSystem {
             };
 
             if let Some(movement) = opt_movement {
-                use ARENA_HEIGHT;
-                transform.translation[1] +=
-                    paddle.velocity * time.delta_seconds() * movement as f32;
+                use crate::ARENA_HEIGHT;
+                transform.translate_y(paddle.velocity * time.delta_seconds() * movement as f32);
 
                 // We make sure the paddle remains in the arena.
-                transform.translation[1] = transform.translation[1]
-                    .max(paddle.height * 0.5)
-                    .min(ARENA_HEIGHT - paddle.height * 0.5);
+                let paddle_y = transform.translation().y;
+                transform.set_y(
+                    paddle_y
+                        .max(paddle.height * 0.5)
+                        .min(ARENA_HEIGHT - paddle.height * 0.5),
+                );
             }
         }
     }

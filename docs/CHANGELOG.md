@@ -11,24 +11,170 @@ The format is based on [Keep a Changelog][kc], and this project adheres to
 
 ### Added
 
-* `amethyst_test` test framework for ergonomic testing of Amethyst applications ([#1000])
-* combinations of buttons triggering actions ([#1043])
-* `UiPrefab` field `hidden: bool` to hide entities ([#1051])
-* `PrefabData` can now be derived for many situations, see the book for more information ([#1035])
-* Support for DirectionalLight and SpotLight in PBM pass. ([#1074], [#1081])
+* Introduce `application_dir` utility ([#1213])
+* Derive `Copy`, `PartialEq`, `Eq`, `Serialize`, `Deserialize` for `Flipped` component. ([#1237])
+* A way to change the default `Source` using `set_default_source` and `with_default_source`. ([#1256])
+* "How To" guides for using assets and defining custom assets. ([#1251])
+* Explanation on how prefabs function in Amethyst. ([#1114])
+* `amethyst_renderer::Rgba` is now a `Component` that changes the color and transparency of the entity
+it is attached to. ([#1282])
+* `AutoFov` and `AutoFovSystem` to adjust horizontal FOV to screen aspect ratio. ([#1281])
+* Add `icon` to `DisplayConfig` to set a window icon using a path to a file ([#1373])
+* Added setting to control gfx_device_gl logging level separately, and set it to Warn by default. ([#1404])
+* Add `loaded_icon` to `DisplayConfig` to set a window icon programatically ([#1405])
+* Added optional feature gates which will reduce compilation times when used. ([#1412])
+* Several passes got `with_transparency_settings` which changes the transparency settings for the pass. ([#1419])
+* Add `SpriteRenderPrefab`. ([#1435])
+* Add `ScreenSpace` component. Draws entities using the screen coordinates. ([#1424])
 
 ### Changed
+
+* Make `application_root_dir` return a `Result<Path>` instead of a `String` ([#1213])
+* Remove unnecessary texture coordinates offset in `Sprite::from_pixel_values` ([#1267])
+* Changed `ActiveCamera` to have the `Option` inside. ([#1280])
+* `AudioBundle::new()` no longer exists, as `AudioBundle` is now a unit type. It also no longer initializes the `DjSystem` ([#1356])
+* Convert everything to use err-derive and amethyst_error ([#1365])
+* Removed redundant code in `renderer.rs` ([#1375])
+* Refactored audio initialization to be more bundle-centric ([#1388])
+* Changed argument types of `exec_removal` to allow use of both Read and Write Storages. ([#1397])
+* Changed default log level to Info. ([#1404])
+* Remove unnecessary `mut` from `AnimationControlSet::has_animation` ([#1408])
+* Moved amethyst_gltf from development workspace to be like the other amethyst_* subcrates. ([#1411])
+* Re-exported amethyst_gltf by amethyst as amethyst::gltf. ([#1411])
+* `Default::default` now returns a pass with transparency enabled for all applicable passes. ([#1419])
+* Several passes had a function named `with_transparency` changed to accept a boolean. ([#1419])
+* `FrameRateLimitConfig` has a `new` constructor, and its fields are made public. ([#1436])
+* Derive `Deserialize, Serialize` for `MaterialPrimitive` and `SpriteRenderPrimitive`, remove
+extra bounds from `AnimatablePrefab` and `AnimationSetPrefab` ([#1435])
+* Simplified some of the conditionals in the Pong tutorial ([#1439])
 
 ### Removed
 
 ### Fixed
 
+* Fixed the "json" feature for amethyst_assets. ([#1302])
+* Fixed default system font loading to accept uppercase extension ("TTF"). ([#1328])
+* Set width and height of Pong Paddles ([#1363])
+* Fix omission in `PosNormTangTex` documentation. ([#1371])
+
+[#1114]: https://github.com/amethyst/amethyst/pull/1114
+[#1213]: https://github.com/amethyst/amethyst/pull/1213
+[#1237]: https://github.com/amethyst/amethyst/pull/1237
+[#1251]: https://github.com/amethyst/amethyst/pull/1251
+[#1256]: https://github.com/amethyst/amethyst/pull/1256
+[#1267]: https://github.com/amethyst/amethyst/pull/1267
+[#1280]: https://github.com/amethyst/amethyst/pull/1280
+[#1282]: https://github.com/amethyst/amethyst/pull/1282
+[#1281]: https://github.com/amethyst/amethyst/pull/1281
+[#1302]: https://github.com/amethyst/amethyst/pull/1302
+[#1328]: https://github.com/amethyst/amethyst/pull/1328
+[#1356]: https://github.com/amethyst/amethyst/pull/1356
+[#1363]: https://github.com/amethyst/amethyst/pull/1363
+[#1365]: https://github.com/amethyst/amethyst/pull/1365
+[#1371]: https://github.com/amethyst/amethyst/pull/1371
+[#1373]: https://github.com/amethyst/amethyst/pull/1373
+[#1388]: https://github.com/amethyst/amethyst/pull/1388
+[#1397]: https://github.com/amethyst/amethyst/pull/1397
+[#1404]: https://github.com/amethyst/amethyst/pull/1404
+[#1408]: https://github.com/amethyst/amethyst/pull/1408
+[#1405]: https://github.com/amethyst/amethyst/pull/1405
+[#1411]: https://github.com/amethyst/amethyst/pull/1411
+[#1412]: https://github.com/amethyst/amethyst/pull/1412
+[#1419]: https://github.com/amethyst/amethyst/pull/1419
+[#1424]: https://github.com/amethyst/amethyst/pull/1424
+[#1435]: https://github.com/amethyst/amethyst/pull/1435
+[#1439]: https://github.com/amethyst/amethyst/pull/1439
+
+## [0.10.0] - 2018-12
+
+### Added
+
+* Derive `PrefabData` for `CameraOrtho` component ([#1188])
+* Partially migrate the project to Rust 2018.  Full migration will be completed at some point after 2019-01-31 ([#1098])
+* `SystemExt::pausable` for better ergonomics when pausing systems for specific states ([#1146]).
+* `amethyst_test` test framework for ergonomic testing of Amethyst applications ([#1000])
+* combinations of buttons triggering actions ([#1043])
+* `UiPrefab` field `hidden: bool` to hide entities ([#1051])
+* `PrefabData` can now be derived for many situations, see the book for more information ([#1035])
+* Support for DirectionalLight and SpotLight in PBM pass. ([#1074], [#1081])
+* `UiWidget` variant `Custom` for custom composited widgets ([#1112])
+* `AssetLoaderSystemData` abstracts resources needed from `World` to do asset loading ([#1090])
+* `amethyst_ui::get_default_font` supports loading system font from Path. ([#1108])
+* Added render utilities to easily create `Material` and `Handle<Texture>`. ([#1126])
+* Added `Callback` and `CallbackQueue` for use in asynchronous contexts. ([#1125])
+* Added Trans event queue. Used to trigger state transitions from systems. Also used to trigger multiple state transitions at once. (For example, to `Trans::Pop` two states.) ([#1069])
+* `sprite_camera_follow` example showing how to use a Camera that has a sprite Parent ([#1099])
+* Added capabilities for the `DrawFlat2D` pass to draw `TextureHandle`s by themselves. Also added a simple example for this. ([#1153])
+* Added a `Flipped` component which allows flipping sprites or images horizontally and vertically. ([#1153])
+* Added transform constructor function `Transform::new()`. ([#1187])
+* Implement generic `EventRetriggerSystem`, which enables dispatching new events as a reaction to other events ([#1189])
+
+### Changed
+
+* Minimum Rust version is now `1.31.0` &ndash; Rust 2018. ([#1224])
+* `Transform::look_at` renamed to `Transform::face_towards` and behavior fixed. ([#1142])
+* `Material` animations now directly use `Handle<Texture>` instead of using indirection. ([#1089])
+* `SpriteRenderPrimitive::SpriteSheet` now takes `Handle<SpriteSheet>` instead of a `u64` ID. ([#1089])
+* `nalgebra` is now the math library used by the engine. ([#1066])
+* The `amethyst::renderer::Projection::orthographic` function has had its parameter order changed to match that of `nalgebra` ([#1066])
+* `SpriteSheet` now use `TextureHandle` directly instead of a `u64` ID coupled with `MaterialTextureSet`. ([#1117])
+* Updated `specs` to `0.14` and `specs-hierarchy` to `0.3`. ([#1122])
+* Updated `winit` to `0.18` (see [Winit's changelog][winit_018]). ([#1131])
+* Updated `glutin` to `0.19` (see [Glutin's changelog][glutin_019]). ([#1131])
+* Renamed the `DrawSprite` pass to `DrawFlat2D` as it now handles both sprites and images without spritesheets. ([#1153])
+* `BasicScenePrefab` deserialization now returns an error on invalid fields. ([#1164])
+* Reordered arguments for `Transform::set_rotation_euler` to match nalgebra's Euler angles. ([#1052])
+* Remove lifetimes from `SimpleState` ([#1198])
+* Button interactions are now handled through an `EventRetriggerSystem`, specifically hover/click sounds and image/color changes ([#1189])
+
+### Removed
+
+* `SpriteSheetSet` is removed as it is no longer needed. ([#1089])
+* `MaterialTextureSet` is removed as it is no longer needed. ([#1117])
+* `amethyst::core::Orientation` has been removed because of limited use. ([#1066])
+* `TimedDestroySystem` has been split into `DestroyAtTimeSystem` and `DestroyInTimeSystem`. ([#1129])
+* Reverted [MacOS OpenGL workaround][#972] in favor of the upstream fix in `glutin`. ([#1184])
+* `OnUiActionImage` and `OnUiActionSound` have been removed as they now work through `EventRetrigger`s ([#1189])
+
+### Fixed
+
+* `SpriteSheetFormat` converts pixel coordinates to texture coordinates on load. ([#1181])
+
+[#1146]: https://github.com/amethyst/amethyst/pull/1146
+[#1144]: https://github.com/amethyst/amethyst/pull/1144
 [#1000]: https://github.com/amethyst/amethyst/pull/1000
 [#1043]: https://github.com/amethyst/amethyst/pull/1043
 [#1051]: https://github.com/amethyst/amethyst/pull/1051
 [#1035]: https://github.com/amethyst/amethyst/pull/1035
+[#1069]: https://github.com/amethyst/amethyst/pull/1069
 [#1074]: https://github.com/amethyst/amethyst/pull/1074
 [#1081]: https://github.com/amethyst/amethyst/pull/1081
+[#1090]: https://github.com/amethyst/amethyst/pull/1090
+[#1112]: https://github.com/amethyst/amethyst/pull/1112
+[#1089]: https://github.com/amethyst/amethyst/pull/1089
+[#1098]: https://github.com/amethyst/amethyst/pull/1098
+[#1099]: https://github.com/amethyst/amethyst/pull/1099
+[#1108]: https://github.com/amethyst/amethyst/pull/1108
+[#1126]: https://github.com/amethyst/amethyst/pull/1126
+[#1125]: https://github.com/amethyst/amethyst/pull/1125
+[#1066]: https://github.com/amethyst/amethyst/pull/1066
+[#1117]: https://github.com/amethyst/amethyst/pull/1117
+[#1122]: https://github.com/amethyst/amethyst/pull/1122
+[#1129]: https://github.com/amethyst/amethyst/pull/1129
+[#1131]: https://github.com/amethyst/amethyst/pull/1131
+[#1153]: https://github.com/amethyst/amethyst/pull/1153
+[#1164]: https://github.com/amethyst/amethyst/pull/1164
+[#1142]: https://github.com/amethyst/amethyst/pull/1142
+[#1052]: https://github.com/amethyst/amethyst/pull/1052
+[#1181]: https://github.com/amethyst/amethyst/pull/1181
+[#1184]: https://github.com/amethyst/amethyst/pull/1184
+[#1187]: https://github.com/amethyst/amethyst/pull/1187
+[#1188]: https://github.com/amethyst/amethyst/pull/1188
+[#1198]: https://github.com/amethyst/amethyst/pull/1198
+[#1224]: https://github.com/amethyst/amethyst/pull/1224
+[#1189]: https://github.com/amethyst/amethyst/pull/1189
+[winit_018]: https://github.com/tomaka/winit/blob/v0.18.0/CHANGELOG.md#version-0180-2018-11-07
+[glutin_019]: https://github.com/tomaka/glutin/blob/master/CHANGELOG.md#version-0190-2018-11-09
 
 ## [0.9.0] - 2018-10
 ### Added
