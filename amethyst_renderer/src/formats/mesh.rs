@@ -146,6 +146,8 @@ impl SimpleFormat<Mesh> for ObjFormat {
 // #[cfg(feature = "vulkan")]
 pub type Backend = rendy::vulkan::Backend;
 
+pub type Factory = rendy::factory::Factory<Backend>;
+
 // #[cfg(not(any(feature = "dx12", feature = "metal", feature = "vulkan")))]
 // pub type Backend = rendy::empty::Backend;
 
@@ -155,7 +157,7 @@ pub struct RendyMesh(pub rendy::mesh::Mesh<Backend>);
 pub struct RendyMeshBuilder(pub rendy::mesh::MeshBuilder<'static>);
 
 impl Asset for RendyMesh {
-    fn name() -> &'static str { "renderer::Mesh" }
+    fn name() -> &'static str { "renderer::RendyMesh" }
     type Data = RendyMeshBuilder;
     type HandleStorage = VecStorage<amethyst_assets::Handle<RendyMesh>>;
 }
@@ -325,6 +327,10 @@ pub fn build_mesh_with_combo(
     )
 }
 
+pub fn create_rendy_mesh_asset(data: RendyMeshBuilder, factory: &mut Factory) -> Result<ProcessingState<RendyMesh>> {
+    Ok(ProcessingState::Loaded(RendyMesh(data.0.build(rendy::command::QueueId(rendy::hal::queue::family::QueueFamilyId(0),0), factory).unwrap())))
+}
+
 /// Trait used by the asset processor to convert any user supplied mesh representation into an
 /// actual `Mesh`.
 ///
@@ -388,5 +394,6 @@ uuid!{
     ObjFormat => 112532186818635996206903539033451216275
 }
 amethyst_assets::asset_type! {
-    Mesh
+    MeshData => Mesh,
+    RendyMeshBuilder => RendyMesh
 }

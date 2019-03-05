@@ -167,11 +167,11 @@ impl Loader {
                 .chain_err(|| ErrorKind::Format(F::name()));
             let tracker = Box::new(tracker) as Box<dyn Tracker>;
 
-            processed.push(Processed::NewAsset {
-                data,
+            processed.push(Processed::Asset {
+                data: data.map(|f| f.data),
                 handle,
                 name,
-                tracker,
+                tracker: Some(tracker),
             });
         };
         self.pool.spawn(cl);
@@ -194,11 +194,11 @@ impl Loader {
         let tracker = progress.create_tracker();
         let tracker = Box::new(tracker);
         let handle = storage.allocate();
-        storage.processed.push(Processed::NewAsset {
-            data: Ok(FormatValue::data(data)),
+        storage.processed.push(Processed::Asset {
+            data: Ok(data),
             handle: handle.clone(),
             name: "<Data>".into(),
-            tracker,
+            tracker: Some(tracker),
         });
 
         handle

@@ -31,7 +31,7 @@ impl Asset for Source {
     type HandleStorage = VecStorage<SourceHandle>;
 }
 amethyst_assets::asset_type! {
-    Source
+    AudioData => Source
 }
 
 

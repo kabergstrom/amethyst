@@ -614,5 +614,5 @@ uuid!{
     BmpFormat => 112532153542807740215881749744992075155
 }
 amethyst_assets::asset_type! {
-    Texture
+    TextureData => Texture
 }

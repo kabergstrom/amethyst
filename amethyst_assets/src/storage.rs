@@ -47,6 +47,7 @@ pub struct AssetStorage<A: Asset> {
     pub(crate) processed: Arc<SegQueue<Processed<A>>>,
     unused_handles: SegQueue<Handle<A>>,
     requeue: Mutex<Vec<Processed<A>>>,
+    to_drop: SegQueue<A>,
 }
 
 /// Returned by processor systems, describes the loading state of the asset.
@@ -107,6 +108,10 @@ impl<A: Asset> AssetStorage<A> {
         }
     }
 
+    pub(crate) fn is_loaded(&self, handle: u32) -> bool {
+        self.bitset.contains(handle)
+    }
+
     /// Get an asset from a given asset handle.
     pub fn get(&self, handle: &Handle<A>) -> Option<&A> {
         if self.bitset.contains(handle.id()) {
@@ -157,14 +162,13 @@ impl<A: Asset> AssetStorage<A> {
 
                 let f = &mut f;
                 match processed {
-                    Processed::NewAsset {
+                    Processed::Asset {
                         data,
                         handle,
                         name,
                         tracker,
                     } => {
                         let asset = match data
-                            .map(|FormatValue { data }| data)
                             .and_then(|d| f(d))
                             .chain_err(|| ErrorKind::Asset(name.clone()))
                         {
@@ -183,13 +187,15 @@ impl<A: Asset> AssetStorage<A> {
                                         "Loading unnecessary asset. Handle {} is unique ",
                                         handle.id()
                                     );
-                                    tracker.fail(
-                                        handle.id(),
-                                        A::name(),
-                                        name,
-                                        Error::from_kind(ErrorKind::UnusedHandle),
-                                    );
-                                } else {
+                                    if let Some(tracker) = tracker {
+                                        tracker.fail(
+                                            handle.id(),
+                                            A::name(),
+                                            name,
+                                            Error::from_kind(ErrorKind::UnusedHandle),
+                                        );
+                                    }
+                                } else if let Some(tracker) = tracker {
                                     tracker.success();
                                 }
 
@@ -202,8 +208,8 @@ impl<A: Asset> AssetStorage<A> {
                                         name,
                                         handle,
                                     );
-                                requeue.push(Processed::NewAsset {
-                                    data: Ok(FormatValue { data: x }),
+                                requeue.push(Processed::Asset {
+                                    data: Ok(x),
                                     handle,
                                     name,
                                     tracker,
@@ -218,18 +224,22 @@ impl<A: Asset> AssetStorage<A> {
                                     handle,
                                     e,
                                 );
-                                tracker.fail(handle.id(), A::name(), name, e);
+                                if let Some(tracker) = tracker {
+                                    tracker.fail(handle.id(), A::name(), name, e);
+                                }
 
                                 continue;
                             }
                         };
-
                         let id = handle.id();
-                        bitset.add(id);
-                        handles.push(handle.clone());
-
-                        // NOTE: the loader has to ensure that a handle will be used
-                        // together with a `Data` only once.
+                        if !bitset.add(id) {
+                            // data doesn't exist for the handle, add it
+                            handles.push(handle.clone());
+                        } else {
+                            unsafe {
+                                self.to_drop.push(assets.remove(id));
+                            }
+                        }
                         unsafe {
                             assets.insert(id, asset);
                         }
@@ -252,7 +262,7 @@ impl<A: Asset> AssetStorage<A> {
             let handle = self.handles.swap_remove(i);
             let id = handle.id();
             unsafe {
-                drop_fn(self.assets.remove(id));
+                self.to_drop.push(self.assets.remove(id));
             }
             self.bitset.remove(id);
 
@@ -262,6 +272,9 @@ impl<A: Asset> AssetStorage<A> {
                 id: Arc::new(id),
                 marker: PhantomData,
             });
+        }
+        while let Some(asset) = self.to_drop.try_pop() {
+            drop_fn(asset);
         }
         if count != 0 {
             debug!("{:?}: Freed {} handle ids", A::name(), count,);
@@ -279,6 +292,7 @@ impl<A: Asset> Default for AssetStorage<A> {
             processed: Arc::new(SegQueue::new()),
             unused_handles: SegQueue::new(),
             requeue: Mutex::new(Vec::default()),
+            to_drop: SegQueue::new(),
         }
     }
 }
@@ -336,7 +350,7 @@ where
     Debug(bound = "")
 )]
 pub struct Handle<A: ?Sized> {
-    id: Arc<u32>,
+    pub(crate) id: Arc<u32>,
     #[derivative(Debug = "ignore")]
     marker: PhantomData<A>,
 }
@@ -345,6 +359,13 @@ impl<A> Handle<A> {
     /// Return the 32 bit id of this handle.
     pub fn id(&self) -> u32 {
         *self.id.as_ref()
+    }
+
+    pub(crate) fn from_arc(id: Arc<u32>) -> Self {
+        Self { 
+            id,
+            marker: PhantomData,
+        }
     }
 
     /// Downgrades the handle and creates a `WeakHandle`.
@@ -371,11 +392,11 @@ where
 }
 
 pub(crate) enum Processed<A: Asset> {
-    NewAsset {
-        data: Result<FormatValue<A>>,
+    Asset {
+        data: Result<A::Data>,
         handle: Handle<A>,
         name: String,
-        tracker: Box<dyn Tracker>,
+        tracker: Option<Box<dyn Tracker>>,
     },
 }
 

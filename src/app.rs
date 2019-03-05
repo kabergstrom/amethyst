@@ -12,7 +12,7 @@ use winit::Event;
 use thread_profiler::{profile_scope, register_thread_with_profiler, write_profile};
 
 use crate::{
-    assets::{DefaultLoader, NewLoader, Loader, Source, WorldStorages},
+    assets::{DefaultLoader, NewLoader, Loader, Source},
     callback_queue::CallbackQueue,
     core::{
         frame_limiter::{FrameLimiter, FrameRateLimitConfig, FrameRateLimitStrategy},
@@ -44,11 +44,10 @@ use crate::{
 /// - `R`: `EventReader` implementation for the given event type `E`
 #[derive(Derivative)]
 #[derivative(Debug)]
-pub struct CoreApplication<'a, T, E = StateEvent, R = StateEventReader, L = DefaultLoader>
+pub struct CoreApplication<'a, T, E = StateEvent, R = StateEventReader>
 where
     T: 'static,
     E: 'static,
-    L: NewLoader,
 {
     /// The world
     #[derivative(Debug = "ignore")]
@@ -61,7 +60,6 @@ where
     #[derivative(Debug = "ignore")]
     trans_reader_id: ReaderId<TransEvent<T, E>>,
     states: StateMachine<'a, T, E>,
-    pub loader: L,
     ignore_window_close: bool,
     data: T,
 }
@@ -130,13 +128,12 @@ where
 /// ```
 ///
 /// [log]: https://crates.io/crates/log
-pub type Application<'a, T> = CoreApplication<'a, T, StateEvent, StateEventReader, DefaultLoader>;
+pub type Application<'a, T> = CoreApplication<'a, T, StateEvent, StateEventReader>;
 
-impl<'a, T, E, R, L> CoreApplication<'a, T, E, R, L>
+impl<'a, T, E, R> CoreApplication<'a, T, E, R>
 where
     T: 'static,
     E: Clone + Send + Sync + 'static,
-    L: NewLoader<HandleType = u32> + Default,
 {
     /// Creates a new Application with the given initial game state.
     /// This will create and allocate all the needed resources for
@@ -193,7 +190,6 @@ where
         I: DataInit<T>,
         for<'b> R: EventReader<'b, Event = E>,
         R: Default,
-        L: NewLoader,
     {
         ApplicationBuilder::new(path, initial_state)?.build(init)
     }
@@ -202,7 +198,7 @@ where
     ///
     /// This is identical in function to
     /// [ApplicationBuilder::new](struct.ApplicationBuilder.html#method.new).
-    pub fn build<P, S>(path: P, initial_state: S) -> Result<ApplicationBuilder<S, T, E, R, L>>
+    pub fn build<P, S>(path: P, initial_state: S) -> Result<ApplicationBuilder<S, T, E, R>>
     where
         P: AsRef<Path>,
         S: State<T, E> + 'a,
@@ -367,8 +363,7 @@ where
         profile_scope!("maintain");
         self.world.maintain();
 
-        let storages = WorldStorages::new(&self.world);
-        self.loader.process(&storages);
+        (*self.world.read_resource::<DefaultLoader>()).process(&self.world.res);
 
         // TODO: replace this with a more customizable method.
         // TODO: effectively, the user should have more control over error handling here
@@ -831,13 +826,12 @@ where
     ///
     /// See the [example show for `ApplicationBuilder::new()`](struct.ApplicationBuilder.html#examples)
     /// for an example on how this method is used.
-    pub fn build<'a, I>(mut self, init: I) -> Result<CoreApplication<'a, T, E, X, L>>
+    pub fn build<'a, I>(mut self, init: I) -> Result<CoreApplication<'a, T, E, X>>
     where
         S: State<T, E> + 'a,
         I: DataInit<T>,
         E: Clone + Send + Sync + 'static,
         X: Default,
-        L: NewLoader,
         for<'b> X: EventReader<'b, Event = E>,
     {
         trace!("Entering `ApplicationBuilder::build`");
@@ -847,6 +841,9 @@ where
         #[cfg(feature = "profiler")]
         profile_scope!("new");
 
+        let mut loader = self.loader.unwrap_or_else(|| L::default());
+        loader.init_world(&mut self.world.res);
+        self.world.add_resource(loader);
         let mut reader = X::default();
         reader.setup(&mut self.world.res);
         let data = init.build(&mut self.world);
@@ -863,7 +860,6 @@ where
             states: StateMachine::new(self.initial_state),
             reader,
             events: Vec::new(),
-            loader: self.loader.unwrap_or_else(|| L::default()),
             ignore_window_close: self.ignore_window_close,
             data,
             event_reader_id,

@@ -19,7 +19,7 @@ use amethyst_core::{
 use crate::{
     config::DisplayConfig,
     error::Result,
-    formats::{create_mesh_asset, create_texture_asset},
+    formats::{RendyMesh, Factory, create_mesh_asset, create_texture_asset, create_rendy_mesh_asset},
     mesh::Mesh,
     mtl::{Material, MaterialDefaults},
     pipe::{PipelineBuild, PipelineData, PolyPipeline},
@@ -39,6 +39,7 @@ pub struct RenderSystem<P> {
     // This only exists to allow the system to re-use a vec allocation
     // during event compression.  It's length 0 except during `fn render`.
     event_vec: Vec<Event>,
+    factory: Factory,
 }
 
 impl<P> RenderSystem<P>
@@ -82,17 +83,21 @@ where
             .get_inner_size()
             .expect("Window no longer exists")
             .into();
+        let config: rendy::factory::Config = Default::default();
+
+        let (factory, _): (Factory, _) = rendy::factory::init(config).unwrap();
         Self {
             pipe,
             renderer,
             cached_size,
             event_vec: Vec::with_capacity(20),
+            factory,
         }
     }
 
     fn asset_loading(
         &mut self,
-        (mut mesh_storage, mut texture_storage): AssetLoadingData<'_>,
+        (mut mesh_storage, mut texture_storage, mut rendy_mesh_storage): AssetLoadingData<'_>,
     ) {
         mesh_storage.process(
             |d| create_mesh_asset(d, &mut self.renderer),
@@ -100,6 +105,10 @@ where
 
         texture_storage.process(
             |d| create_texture_asset(d, &mut self.renderer),
+        );
+        
+        rendy_mesh_storage.process(
+            |d| create_rendy_mesh_asset(d, &mut self.factory),
         );
     }
 
@@ -150,6 +159,7 @@ where
 type AssetLoadingData<'a> = (
     Write<'a, AssetStorage<Mesh>>,
     Write<'a, AssetStorage<Texture>>,
+    Write<'a, AssetStorage<RendyMesh>>,
 );
 
 type WindowData<'a> = (Write<'a, WindowMessages>, WriteExpect<'a, ScreenDimensions>);

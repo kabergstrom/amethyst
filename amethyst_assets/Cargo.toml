@@ -42,7 +42,6 @@ uuid = { version = "0.7", features = ["v4", "serde"] }
 atelier_loader = { path = "../../atelier-assets/loader" }
 atelier_importer = { path = "../../atelier-assets/importer" }
 bincode = "1.0"
-inventory = "0.1"
 
 [dev-dependencies]
 

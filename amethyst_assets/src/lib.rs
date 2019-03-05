@@ -23,9 +23,9 @@ pub use crate::{
     reload::{HotReloadBundle, HotReloadStrategy, HotReloadSystem, Reload, SingleFile},
     source::{Directory, Source},
     storage::{AssetStorage, Handle, ProcessingState, Processor, WeakHandle},
-    new_loader::{create_asset_type, Loader as NewLoader, DefaultLoader, WorldStorages},
+    new_loader::{create_asset_type, DefaultLoader, Loader as NewLoader},
 };
-pub use inventory;
+pub use atelier_importer::inventory;
 
 
 mod asset;
