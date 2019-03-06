@@ -33,6 +33,9 @@ impl Asset for Source {
 amethyst_assets::asset_type! {
     AudioData => Source
 }
+serde_dyn::uuid! {
+    Source => 318750959953651796347839804379656784993
+}
 
 
 impl Into<Result<ProcessingState<Source>>> for AudioData {

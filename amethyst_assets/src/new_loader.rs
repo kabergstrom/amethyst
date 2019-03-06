@@ -10,7 +10,7 @@ use std::{
     sync::Arc,
 };
 
-pub trait Loader {
+pub trait Loader: Send + Sync {
     type LoadOp;
     fn add_asset_ref(&mut self, id: AssetUuid) -> Self::LoadOp;
     fn get_asset_load(&self, id: &AssetUuid) -> Option<Self::LoadOp>;
@@ -22,12 +22,12 @@ pub trait Loader {
 
 pub type DefaultLoader = LoaderWithStorage<atelier_loader::rpc_loader::RpcLoader<Arc<u32>>>;
 #[derive(Default, Debug)]
-pub struct LoaderWithStorage<T: AtelierLoader<HandleType = Arc<u32>>> {
+pub struct LoaderWithStorage<T: AtelierLoader<HandleType = Arc<u32>> + Send + Sync> {
     loader: T,
     storage_map: AssetStorageMap,
 }
 
-impl<T: AtelierLoader<HandleType = Arc<u32>>> Loader for LoaderWithStorage<T> {
+impl<T: AtelierLoader<HandleType = Arc<u32>> + Send + Sync> Loader for LoaderWithStorage<T> {
     type LoadOp = <T as AtelierLoader>::LoadOp;
     fn add_asset_ref(&mut self, id: AssetUuid) -> Self::LoadOp {
         self.loader.add_asset_ref(id)
@@ -43,7 +43,7 @@ impl<T: AtelierLoader<HandleType = Arc<u32>>> Loader for LoaderWithStorage<T> {
         let maybe_asset = self.loader.get_asset(load);
         if let Some((ref asset_type, ref asset_handle)) = maybe_asset {
             if asset_type != &uuid.to_le_bytes() {
-                log::warn!("tried to fetch asset handle for type {} but type mismatched", A::name());
+                log::warn!("tried to fetch asset handle for type {} with uuid {:?} but type mismatched, expected uuid {:?}", A::name(), A::UUID, u128::from_le_bytes(*asset_type));
                 return None
             } else {
                 return maybe_asset.map(|(_, handle)| Handle::from_arc(handle))
@@ -101,7 +101,7 @@ impl AssetStorageMap {
     pub fn new() -> AssetStorageMap {
         let mut asset_types = HashMap::new();
         for t in crate::inventory::iter::<AssetType> {
-            asset_types.insert(t.uuid, t.clone());
+            asset_types.insert(t.data_uuid, t.clone());
         }
         AssetStorageMap {
             storages: asset_types,
@@ -161,21 +161,23 @@ impl<'a> atelier_loader::AssetStorage for WorldStorages<'a> {
 }
 #[derive(Clone)]
 pub struct AssetType {
-    pub uuid: AssetTypeId,
+    pub data_uuid: AssetTypeId,
+    pub asset_uuid: AssetTypeId,
     pub create_storage: fn(&mut Resources),
     pub with_storage: fn(&Resources, &mut dyn FnMut(&dyn AssetTypeStorage)),
 }
 impl std::fmt::Debug for AssetType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "AssetType {{ uuid: {:?} }}", self.uuid)
+        write!(f, "AssetType {{ data_uuid: {:?}, asset_uud: {:?} }}", self.data_uuid, self.asset_uuid)
     }
 }
 crate::inventory::collect!(AssetType);
 
-pub fn create_asset_type<A: Asset>() -> AssetType 
+pub fn create_asset_type<A: Asset + TypeUuid>() -> AssetType 
 where for<'a> A::Data: Deserialize<'a> + TypeUuid {
     AssetType {
-        uuid: A::Data::UUID.to_le_bytes(),
+        data_uuid: A::Data::UUID.to_le_bytes(),
+        asset_uuid: A::UUID.to_le_bytes(),
         create_storage: |res| {
             if res.try_fetch::<AssetStorage::<A>>().is_none() {
                 res.insert(AssetStorage::<A>::default())

@@ -191,7 +191,7 @@ where
         for<'b> R: EventReader<'b, Event = E>,
         R: Default,
     {
-        ApplicationBuilder::new(path, initial_state)?.build(init)
+        ApplicationBuilder::<S, T, E, R>::new(path, initial_state)?.build(init)
     }
 
     /// Creates a new ApplicationBuilder with the given initial game state.
@@ -363,7 +363,7 @@ where
         profile_scope!("maintain");
         self.world.maintain();
 
-        (*self.world.read_resource::<DefaultLoader>()).process(&self.world.res);
+        (*self.world.write_resource::<DefaultLoader>()).process(&self.world.res);
 
         // TODO: replace this with a more customizable method.
         // TODO: effectively, the user should have more control over error handling here
@@ -405,7 +405,7 @@ pub struct ApplicationBuilder<S, T, E, R, L = DefaultLoader> {
     phantom: PhantomData<(T, E, R)>,
 }
 
-impl<S, T, E, X, L: NewLoader + Default> ApplicationBuilder<S, T, E, X, L>
+impl<S, T, E, X, L: NewLoader + Default + 'static> ApplicationBuilder<S, T, E, X, L>
 where
     T: 'static,
 {

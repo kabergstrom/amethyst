@@ -48,7 +48,7 @@ ron = "0.4"
 serde = { version = "1", features = ["derive"] }
 shred-derive = "0.5"
 shred = "0.7"
-wavefront_obj = "5.1"
+wavefront_obj = { git = "https://github.com/Frizi/wavefront_obj.git" }
 winit = { version = "0.18", features = ["serde"] }
 serde_dyn = "0.2.2"
 
