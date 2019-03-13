@@ -234,6 +234,7 @@ impl<A: Asset> AssetStorage<A> {
                         let id = handle.id();
                         if !bitset.add(id) {
                             // data doesn't exist for the handle, add it
+                            log::info!("added asset {}", id);
                             handles.push(handle.clone());
                         } else {
                             unsafe {
@@ -261,6 +262,7 @@ impl<A: Asset> AssetStorage<A> {
             skip = i;
             let handle = self.handles.swap_remove(i);
             let id = handle.id();
+                            log::info!("dropped asset {}", id);
             unsafe {
                 self.to_drop.push(self.assets.remove(id));
             }
