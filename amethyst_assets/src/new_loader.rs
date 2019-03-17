@@ -1,5 +1,6 @@
 use crate::{
-    storage::{Handle, Processed},
+    storage::{Handle},
+    processor::{Processed, ProcessingQueue},
     Asset, AssetStorage,
 };
 use amethyst_core::specs::Resources;
@@ -10,9 +11,53 @@ use serde::de::Deserialize;
 use serde_dyn::TypeUuid;
 use std::{collections::HashMap, error::Error, sync::Arc};
 
-pub trait Loader: Send + Sync {
-    fn add_asset_ref(&self, id: AssetUuid);
-    fn decrease_asset_ref(&self, id: AssetUuid);
+enum LoadStatus {
+    NotRequested,
+    Loading,
+    Error(amethyst_error::Error),
+    Loaded,
+    DoesNotExist,
+}
+
+struct LoadHandle {
+    chan: Arc<Sender<RefOp>>,
+    id: u32,
+}
+impl AssetHandle for LoadHandle {
+    fn get_id(&self) -> u32 {
+        self.id
+    }
+}
+
+struct WeakHandle {
+    load_handle: u32,
+}
+impl AssetHandle for WeakHandle {  }
+
+trait AssetHandle {
+    fn get_load_status<T: Loader>(&self, loader: &T) -> LoadStatus {
+        loader.get_load_status(self.get_id())
+    }
+    fn get_asset<'a, T: Asset + TypeUuid>(&self, storage: &'a AssetStorage<T>) -> Option<&'a T>;
+    fn get_asset_mut<'a, T: Asset + TypeUuid>(&self, storage: &'a mut AssetStorage<T>) -> Option<&'a mut T>;
+    fn get_version<'a, T: Asset + TypeUuid>(&self, storage: &'a AssetStorage<T>) -> u32;
+    fn get_asset_with_version<'a, T: Asset + TypeUuid>(&self, storage: &'a AssetStorage<T>) -> Option<(&'a T, u32)>;
+    fn get_id(&self) -> u32;
+}
+
+pub(crate) trait LoaderInternal {
+    fn load_asset(&self, id: u32) -> LoadHandle;
+    fn get_handle_load_status(&self, id: u32) -> LoadStatus;
+    fn get_asset_handle<T: Asset + TypeUuid>(&self, id: u32) -> Option<Handle<T>>;
+    fn get_asset<'a, T: Asset + TypeUuid>(&self, id: u32, storage: &'a AssetStorage<T>) -> Option<&'a T>;
+    fn get_asset_mut<'a, T: Asset + TypeUuid>(&self, id: u32, storage: &'a mut AssetStorage<T>) -> Option<&'a mut T>;
+    fn init_world(&mut self, resources: &mut Resources);
+    fn process(&mut self, resources: &Resources) -> Result<(), Box<dyn Error>>;
+}
+
+pub trait Loader: Send + Sync + LoaderInternal {
+    fn load_asset(&self, id: AssetUuid) -> LoadHandle;
+    fn get_load_status(&self, id: AssetUuid) -> LoadStatus;
     fn get_asset_handle<T: Asset + TypeUuid>(&self, id: AssetUuid) -> Option<Handle<T>>;
     fn get_asset<'a, T: Asset + TypeUuid>(&self, id: AssetUuid, storage: &'a AssetStorage<T>) -> Option<&'a T>;
     fn get_asset_mut<'a, T: Asset + TypeUuid>(&self, id: AssetUuid, storage: &'a mut AssetStorage<T>) -> Option<&'a mut T>;
@@ -20,19 +65,19 @@ pub trait Loader: Send + Sync {
     fn process(&mut self, resources: &Resources) -> Result<(), Box<dyn Error>>;
 }
 
-pub type DefaultLoader = LoaderWithStorage<atelier_loader::rpc_loader::RpcLoader<Arc<u32>>>;
+pub type DefaultLoader = LoaderWithStorage<atelier_loader::rpc_loader::RpcLoader<()>>;
 enum RefOp {
     Increase(AssetUuid),
     Decrease(AssetUuid),
 }
 #[derive(Debug)]
-pub struct LoaderWithStorage<T: AtelierLoader<HandleType = Arc<u32>> + Send + Sync> {
+pub struct LoaderWithStorage<T: AtelierLoader<HandleType = ()> + Send + Sync> {
     loader: T,
     storage_map: AssetStorageMap,
     ref_sender: Sender<RefOp>,
     ref_receiver: Receiver<RefOp>,
 }
-impl<T: AtelierLoader<HandleType = Arc<u32>> + Send + Sync + Default> Default
+impl<T: AtelierLoader<HandleType = ()> + Send + Sync + Default> Default
     for LoaderWithStorage<T>
 {
     fn default() -> Self {
@@ -46,7 +91,7 @@ impl<T: AtelierLoader<HandleType = Arc<u32>> + Send + Sync + Default> Default
     }
 }
 
-impl<T: AtelierLoader<HandleType = Arc<u32>> + Send + Sync> Loader for LoaderWithStorage<T> {
+impl<T: AtelierLoader<HandleType = ()> + Send + Sync> Loader for LoaderWithStorage<T> {
     fn add_asset_ref(&self, id: AssetUuid) {
         self.ref_sender.send(RefOp::Increase(id));
     }
@@ -57,8 +102,8 @@ impl<T: AtelierLoader<HandleType = Arc<u32>> + Send + Sync> Loader for LoaderWit
         let asset_type = A::UUID;
         let maybe_asset = self.loader.get_asset(id);
         if let Some((ref data_type, ref asset_handle)) = maybe_asset {
-            if let Some(storage_type) = self.storage_map.storages_by_asset_uuid.get(&asset_type.to_le_bytes()) {
-            if data_type != &storage_type.data_uuid {
+            if let Some(storage_type) = self.storage_map.storages_by_data_uuid.get(&data_type.to_le_bytes()) {
+            if asset_type != &storage_type.asset_uuid {
                 log::warn!("tried to fetch asset handle for type {} with uuid {:?} but type mismatched, expected uuid {:?}", A::name(), A::UUID, asset_type);
                 return None;
             } else {
@@ -178,7 +223,7 @@ impl<'a> WorldStorages<'a> {
 }
 
 impl<'a> atelier_loader::AssetStorage for WorldStorages<'a> {
-    type HandleType = Arc<u32>;
+    type HandleType = ();
     fn allocate(&self, asset_type: &AssetTypeId, id: &AssetUuid) -> Self::HandleType {
         let mut handle = None;
         (self

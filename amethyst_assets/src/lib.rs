@@ -22,7 +22,8 @@ pub use crate::{
     progress::{Completion, Progress, ProgressCounter, Tracker},
     reload::{HotReloadBundle, HotReloadStrategy, HotReloadSystem, Reload, SingleFile},
     source::{Directory, Source},
-    storage::{AssetStorage, Handle, ProcessingState, Processor, WeakHandle},
+    storage::{AssetStorage, Handle, WeakHandle},
+    processor::{ProcessingState, Processor},
     new_loader::{create_asset_type, DefaultLoader, Loader as NewLoader},
 };
 pub use atelier_importer::inventory;
@@ -39,5 +40,6 @@ mod progress;
 mod reload;
 mod source;
 mod storage;
+mod processor;
 #[macro_use]
 mod new_loader;
