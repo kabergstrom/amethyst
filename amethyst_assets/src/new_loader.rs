@@ -1,10 +1,9 @@
 use crate::{
-    storage::{Handle},
     processor::{Processed, ProcessingQueue},
     Asset, AssetStorage,
 };
 use amethyst_core::specs::Resources;
-use atelier_loader::{self, AssetTypeId, AssetUuid, Loader as AtelierLoader};
+use atelier_loader::{self, AssetTypeId, AssetUuid, Loader as AtelierLoader, LoadHandle};
 use bincode;
 use crossbeam::channel::{unbounded, Receiver, Sender};
 use serde::de::Deserialize;
@@ -19,11 +18,20 @@ enum LoadStatus {
     DoesNotExist,
 }
 
-struct LoadHandle {
+struct GenericHandle {
     chan: Arc<Sender<RefOp>>,
     id: u32,
 }
-impl AssetHandle for LoadHandle {
+impl AssetHandle for Handle {
+    fn get_id(&self) -> u32 {
+        self.id
+    }
+}
+struct GenericHandle {
+    chan: Arc<Sender<RefOp>>,
+    id: u32,
+}
+impl AssetHandle for Handle {
     fn get_id(&self) -> u32 {
         self.id
     }
