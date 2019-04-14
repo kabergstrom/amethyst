@@ -1,7 +1,9 @@
 use gfx_glyph::Font;
 use serde::{Deserialize, Serialize};
 
-use amethyst_assets::{Asset, Error, Handle, ProcessingState, ResultExt, SimpleFormat};
+use amethyst_assets::{
+    Asset, Error, Handle, NewProcessingState, ProcessingState, ResultExt, SimpleFormat,
+};
 use amethyst_core::specs::prelude::VecStorage;
 
 /// A loaded set of fonts from a file.
@@ -15,7 +17,9 @@ pub type FontHandle = Handle<FontAsset>;
 pub struct FontData(Font<'static>);
 
 impl Asset for FontAsset {
-    fn name() -> &'static str { "ui::Font"}
+    fn name() -> &'static str {
+        "ui::Font"
+    }
     type Data = FontData;
     type HandleStorage = VecStorage<Handle<Self>>;
 }
@@ -23,6 +27,12 @@ impl Asset for FontAsset {
 impl Into<Result<ProcessingState<FontAsset>, Error>> for FontData {
     fn into(self) -> Result<ProcessingState<FontAsset>, Error> {
         Ok(ProcessingState::Loaded(FontAsset(self.0)))
+    }
+}
+
+impl Into<Result<NewProcessingState<FontData, FontAsset>, Error>> for FontData {
+    fn into(self) -> Result<NewProcessingState<FontData, FontAsset>, Error> {
+        Ok(NewProcessingState::Loaded(FontAsset(self.0)))
     }
 }
 
@@ -44,7 +54,9 @@ pub type OtfFormat = TtfFormat;
 pub struct TtfFormat;
 
 impl SimpleFormat<FontAsset> for TtfFormat {
-    fn name() -> &'static str { "TTF/OTF"}
+    fn name() -> &'static str {
+        "TTF/OTF"
+    }
     type Options = ();
 
     fn import(&self, bytes: Vec<u8>, _: ()) -> Result<FontData, Error> {
@@ -64,7 +76,9 @@ pub enum FontFormat {
 }
 
 impl SimpleFormat<FontAsset> for FontFormat {
-    fn name() -> &'static str { "FontFormat"}
+    fn name() -> &'static str {
+        "FontFormat"
+    }
     type Options = ();
 
     fn import(&self, bytes: Vec<u8>, _: ()) -> Result<FontData, Error> {

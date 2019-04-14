@@ -13,7 +13,7 @@ use atelier_importer::{SerdeObj, ImporterValue, ImportedAsset, Importer};
 pub use atelier_importer as importer;
 use serde_dyn::{uuid, TypeUuid};
 
-use crate::{ErrorKind, Handle, Reload, Result, ResultExt, SingleFile, Source};
+use crate::{ErrorKind, Handle, Result, ResultExt, Source};
 
 
 /// One of the three core traits of this crate.
@@ -126,8 +126,6 @@ where
                 .load_with_metadata(&name)
                 .chain_err(|| ErrorKind::Source)?;
             let data = T::import(&self, b, options.clone())?;
-            let reload = SingleFile::new(self.clone(), m, options, name, source);
-            let reload = Some(Box::new(reload) as Box<dyn Reload<A>>);
             Ok(FormatValue { data })
         } else {
             let b = source.load(&name).chain_err(|| ErrorKind::Source)?;

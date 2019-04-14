@@ -7,7 +7,8 @@ use minterpolate::{get_input_index, InterpolationFunction, InterpolationPrimitiv
 use serde::{Deserialize, Serialize};
 
 use amethyst_assets::{
-    Asset, AssetStorage, Handle, PrefabData, PrefabError, ProcessingState, Result,
+    Asset, AssetStorage, Handle, NewProcessingState, PrefabData, PrefabError, ProcessingState,
+    Result,
 };
 use amethyst_core::{
     shred::SystemData,
@@ -98,7 +99,9 @@ impl<T> Asset for Sampler<T>
 where
     T: InterpolationPrimitive + Send + Sync + 'static,
 {
-    fn name() -> &'static str { "animation::Sampler"}
+    fn name() -> &'static str {
+        "animation::Sampler"
+    }
     type Data = Self;
     type HandleStorage = VecStorage<Handle<Self>>;
 }
@@ -109,6 +112,15 @@ where
 {
     fn into(self) -> Result<ProcessingState<Sampler<T>>> {
         Ok(ProcessingState::Loaded(self))
+    }
+}
+
+impl<T> Into<Result<NewProcessingState<Sampler<T>, Sampler<T>>>> for Sampler<T>
+where
+    T: InterpolationPrimitive + Send + Sync + 'static,
+{
+    fn into(self) -> Result<NewProcessingState<Sampler<T>, Sampler<T>>> {
+        Ok(NewProcessingState::Loaded(self))
     }
 }
 
@@ -284,7 +296,9 @@ impl<T> Asset for Animation<T>
 where
     T: AnimationSampling,
 {
-    fn name() -> &'static str { "animation::Animation"}
+    fn name() -> &'static str {
+        "animation::Animation"
+    }
     type Data = Self;
     type HandleStorage = VecStorage<Handle<Self>>;
 }
@@ -295,6 +309,15 @@ where
 {
     fn into(self) -> Result<ProcessingState<Animation<T>>> {
         Ok(ProcessingState::Loaded(self))
+    }
+}
+
+impl<T> Into<Result<NewProcessingState<Animation<T>, Animation<T>>>> for Animation<T>
+where
+    T: AnimationSampling,
+{
+    fn into(self) -> Result<NewProcessingState<Animation<T>, Animation<T>>> {
+        Ok(NewProcessingState::Loaded(self))
     }
 }
 

@@ -3,7 +3,8 @@
 use std::result::Result as StdResult;
 
 use amethyst_assets::{
-    Asset, AssetStorage, Handle, Loader, PrefabData, PrefabError, ProcessingState, Result,
+    Asset, AssetStorage, Handle, Loader, NewProcessingState, PrefabData, PrefabError,
+    ProcessingState, Result,
 };
 use amethyst_core::specs::prelude::{Entity, Read, ReadExpect, VecStorage};
 
@@ -26,7 +27,9 @@ impl AsRef<[u8]> for Source {
 }
 
 impl Asset for Source {
-    fn name() -> &'static str { "audio::Source" }
+    fn name() -> &'static str {
+        "audio::Source"
+    }
     type Data = AudioData;
     type HandleStorage = VecStorage<SourceHandle>;
 }
@@ -37,10 +40,15 @@ serde_dyn::uuid! {
     Source => 318750959953651796347839804379656784993
 }
 
-
 impl Into<Result<ProcessingState<Source>>> for AudioData {
     fn into(self) -> Result<ProcessingState<Source>> {
         Ok(ProcessingState::Loaded(Source { bytes: self.0 }))
+    }
+}
+
+impl Into<Result<NewProcessingState<AudioData, Source>>> for AudioData {
+    fn into(self) -> Result<NewProcessingState<AudioData, Source>> {
+        Ok(NewProcessingState::Loaded(Source { bytes: self.0 }))
     }
 }
 

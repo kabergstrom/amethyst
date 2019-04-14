@@ -8,8 +8,7 @@ use rayon::ThreadPool;
 use thread_profiler::profile_scope;
 
 use crate::{
-    storage::{AssetStorage, Handle},
-    processor::Processed,
+    storage::{AssetStorage, Handle, Processed},
     Asset, Directory, ErrorKind, Format, FormatValue, Progress, ResultExt, Source,
 };
 

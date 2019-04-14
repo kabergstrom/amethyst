@@ -2,8 +2,8 @@ use ron::de::from_bytes as from_ron_bytes;
 use serde::{Deserialize, Serialize};
 
 use amethyst_assets::{
-    Asset, Error as AssetsError, ErrorKind as AssetsErrorKind, Handle, ProcessingState,
-    Result as AssetsResult, SimpleFormat,
+    Asset, Error as AssetsError, ErrorKind as AssetsErrorKind, Handle, NewProcessingState,
+    ProcessingState, Result as AssetsResult, SimpleFormat,
 };
 use amethyst_core::specs::prelude::{Component, DenseVecStorage, VecStorage};
 
@@ -24,7 +24,9 @@ pub struct SpriteSheet {
 }
 
 impl Asset for SpriteSheet {
-    fn name() -> &'static str { "renderer::SpriteSheet"}
+    fn name() -> &'static str {
+        "renderer::SpriteSheet"
+    }
     type Data = Self;
     type HandleStorage = VecStorage<Handle<Self>>;
 }
@@ -32,6 +34,14 @@ impl Asset for SpriteSheet {
 impl From<SpriteSheet> for AssetsResult<ProcessingState<SpriteSheet>> {
     fn from(sprite_sheet: SpriteSheet) -> AssetsResult<ProcessingState<SpriteSheet>> {
         Ok(ProcessingState::Loaded(sprite_sheet))
+    }
+}
+
+impl From<SpriteSheet> for AssetsResult<NewProcessingState<SpriteSheet, SpriteSheet>> {
+    fn from(
+        sprite_sheet: SpriteSheet,
+    ) -> AssetsResult<NewProcessingState<SpriteSheet, SpriteSheet>> {
+        Ok(NewProcessingState::Loaded(sprite_sheet))
     }
 }
 
@@ -295,7 +305,9 @@ struct SerializedSpriteSheet {
 pub struct SpriteSheetFormat;
 
 impl SimpleFormat<SpriteSheet> for SpriteSheetFormat {
-    fn name() -> &'static str { "SPRITE_SHEET"}
+    fn name() -> &'static str {
+        "SPRITE_SHEET"
+    }
 
     type Options = Handle<Texture>;
 

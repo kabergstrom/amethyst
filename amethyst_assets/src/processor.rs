@@ -21,8 +21,9 @@ use amethyst_core::{
 use crate::{
     asset::{Asset, FormatValue},
     error::{Error, ErrorKind, Result, ResultExt},
-    storage::AssetStorage,
+    new_storage::AssetStorage,
     progress::Tracker,
+    new_loader::LoadHandle,
 };
 
 
@@ -65,7 +66,7 @@ where
 
 pub(crate) struct Processed<T> {
     data: Result<T>,
-    handle: u32,
+    handle: LoadHandle,
     tracker: Option<Box<dyn Tracker>>,
 }
 
@@ -95,7 +96,7 @@ impl<T> Default for ProcessingQueue<T> {
 impl<T> ProcessingQueue<T> {
 
     /// Enqueue asset data for processing
-    pub(crate) fn enqueue(&self, handle: u32, data: T) {
+    pub(crate) fn enqueue(&self, handle: LoadHandle, data: T) {
         self.processed.push(Processed {
             data: Ok(data),
             handle,
@@ -106,7 +107,7 @@ impl<T> ProcessingQueue<T> {
     pub fn process<F, A: Asset>(
         &mut self,
         storage: &mut AssetStorage<A>,
-        f: F,
+        mut f: F,
     ) where
         F: FnMut(T) -> Result<ProcessingState<T, A>>,
     {
@@ -126,15 +127,15 @@ impl<T> ProcessingQueue<T> {
                     } => {
                         let asset = match data
                             .and_then(|d| f(d))
-                            .chain_err(|| ErrorKind::Asset(name.clone()))
+                            // .chain_err(|| ErrorKind::Asset(name.clone()))
                         {
                             Ok(ProcessingState::Loaded(x)) => {
-                                debug!(
-                                        "{:?}: Asset {:?} (handle id: {:?}) has been loaded successfully",
-                                        A::name(),
-                                        name,
-                                        handle,
-                                    );
+                                // debug!(
+                                //         "{:?}: Asset {:?} (handle id: {:?}) has been loaded successfully",
+                                //         A::name(),
+                                //         name,
+                                //         handle,
+                                //     );
                                 // TODO do this in loader?
                                 // // Add a warning if a handle is unique (i.e. asset does not
                                 // // need to be loaded as it is not used by anything)
@@ -159,12 +160,12 @@ impl<T> ProcessingQueue<T> {
                                 x
                             }
                             Ok(ProcessingState::Loading(x)) => {
-                                debug!(
-                                        "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
-                                        A::name(),
-                                        name,
-                                        handle,
-                                    );
+                                // debug!(
+                                //         "{:?}: Asset {:?} (handle id: {:?}) is not complete, readding to queue",
+                                //         A::name(),
+                                //         name,
+                                //         handle,
+                                //     );
                                 requeue.push(Processed {
                                     data: Ok(x),
                                     handle,
@@ -173,22 +174,22 @@ impl<T> ProcessingQueue<T> {
                                 continue;
                             }
                             Err(e) => {
-                                error!(
-                                    "{:?}: Asset {:?} (handle id: {:?}) could not be loaded: {}",
-                                    A::name(),
-                                    name,
-                                    handle,
-                                    e,
-                                );
-                                if let Some(tracker) = tracker {
-                                    tracker.fail(handle, A::name(), name, e);
-                                }
+                                // error!(
+                                //     "{:?}: Asset {:?} (handle id: {:?}) could not be loaded: {}",
+                                //     A::name(),
+                                //     name,
+                                //     handle,
+                                //     e,
+                                // );
+                                // if let Some(tracker) = tracker {
+                                //     tracker.fail(handle, A::name(), name, e);
+                                // }
                                 // TODO figure out how to communicate the failure to the Loader
 
                                 continue;
                             }
                         };
-                        storage.update_asset(handle, asset);
+                        storage.update_asset(&handle, asset);
                     }
                 };
             }

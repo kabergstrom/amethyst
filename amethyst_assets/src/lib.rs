@@ -12,22 +12,22 @@
 #[cfg(feature = "json")]
 pub use crate::formats::JsonFormat;
 pub use crate::{
-    asset::{Asset, Format, FormatValue, SimpleFormat, AssetUUID, importer, SimpleImporter},
+    asset::{importer, Asset, AssetUUID, Format, FormatValue, SimpleFormat, SimpleImporter},
     cache::Cache,
     error::{Error, ErrorKind, Result, ResultExt},
     formats::RonFormat,
     helper::AssetLoaderSystemData,
     loader::Loader,
+    new_loader::{create_asset_type, DefaultLoader, Loader as NewLoader},
     prefab::{AssetPrefab, Prefab, PrefabData, PrefabError, PrefabLoader, PrefabLoaderSystem},
+    processor::{ProcessingState as NewProcessingState, Processor},
     progress::{Completion, Progress, ProgressCounter, Tracker},
     reload::{HotReloadBundle, HotReloadStrategy, HotReloadSystem, Reload, SingleFile},
     source::{Directory, Source},
-    storage::{AssetStorage, Handle, WeakHandle},
-    processor::{ProcessingState, Processor},
-    new_loader::{create_asset_type, DefaultLoader, Loader as NewLoader},
+    storage::{AssetStorage, Handle, ProcessingState, WeakHandle},
+    new_storage::{AssetStorage as NewAssetStorage},
 };
 pub use atelier_importer::inventory;
-
 
 mod asset;
 mod cache;
@@ -36,10 +36,11 @@ mod formats;
 mod helper;
 mod loader;
 mod prefab;
+mod processor;
 mod progress;
 mod reload;
 mod source;
 mod storage;
-mod processor;
 #[macro_use]
 mod new_loader;
+mod new_storage;
