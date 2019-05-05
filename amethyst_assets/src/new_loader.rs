@@ -1,25 +1,23 @@
 use crate::{
-    processor::{Processed, ProcessingQueue},
-    Asset, 
     new_storage::AssetStorage,
+    processor::{Processed, ProcessingQueue},
+    Asset,
 };
-use amethyst_core::{
-    specs::{
-        Resources,
-        prelude::{Component, System, DenseVecStorage, Write},
-        storage::UnprotectedStorage,
-    },
+use amethyst_core::specs::{
+    prelude::{Component, DenseVecStorage, System, Write},
+    storage::UnprotectedStorage,
+    Resources,
 };
-use atelier_loader::{self, AssetTypeId, AssetUuid, Loader as AtelierLoader};
+use atelier_loader::{self, AssetLoadOp, AssetTypeId, AssetUuid, Loader as AtelierLoader};
 use bincode;
-use derivative::Derivative;
 use crossbeam::channel::{unbounded, Receiver, Sender};
+use derivative::Derivative;
 use serde::de::Deserialize;
 use serde_dyn::TypeUuid;
-use std::{collections::HashMap, error::Error, sync::Arc, marker::PhantomData};
+use std::{collections::HashMap, error::Error, marker::PhantomData, sync::Arc};
 
-pub use atelier_loader::LoadStatus;
 pub(crate) use atelier_loader::LoadHandle;
+pub use atelier_loader::LoadStatus;
 
 #[derive(Derivative)]
 #[derivative(
@@ -67,10 +65,7 @@ pub struct GenericHandle {
 }
 impl GenericHandle {
     fn new(chan: Arc<Sender<RefOp>>, handle: LoadHandle) -> Self {
-        Self {
-            chan,
-            id: handle,
-        }
+        Self { chan, id: handle }
     }
 }
 impl Drop for GenericHandle {
@@ -97,9 +92,7 @@ pub struct WeakHandle {
 }
 impl WeakHandle {
     fn new(handle: LoadHandle) -> Self {
-        WeakHandle {
-            id: handle,
-        }
+        WeakHandle { id: handle }
     }
 }
 impl AssetHandle for WeakHandle {
@@ -117,19 +110,33 @@ pub trait AssetHandle {
         loader.get_load_status_handle(self.get_load_handle())
     }
     fn get_asset<'a, T: Asset + TypeUuid>(&self, storage: &'a AssetStorage<T>) -> Option<&'a T>
-    where Self: Sized {
+    where
+        Self: Sized,
+    {
         storage.get(self)
     }
-    fn get_asset_mut<'a, T: Asset + TypeUuid>(&self, storage: &'a mut AssetStorage<T>) -> Option<&'a mut T> 
-    where Self: Sized {
+    fn get_asset_mut<'a, T: Asset + TypeUuid>(
+        &self,
+        storage: &'a mut AssetStorage<T>,
+    ) -> Option<&'a mut T>
+    where
+        Self: Sized,
+    {
         storage.get_mut(self)
     }
-    fn get_version<'a, T: Asset + TypeUuid>(&self, storage: &'a AssetStorage<T>) -> Option<u32> 
-    where Self: Sized {
+    fn get_version<'a, T: Asset + TypeUuid>(&self, storage: &'a AssetStorage<T>) -> Option<u32>
+    where
+        Self: Sized,
+    {
         storage.get_version(self)
     }
-    fn get_asset_with_version<'a, T: Asset + TypeUuid>(&self, storage: &'a AssetStorage<T>) -> Option<(&'a T, u32)> 
-    where Self: Sized {
+    fn get_asset_with_version<'a, T: Asset + TypeUuid>(
+        &self,
+        storage: &'a AssetStorage<T>,
+    ) -> Option<(&'a T, u32)>
+    where
+        Self: Sized,
+    {
         storage.get_asset_with_version(self)
     }
     /// Downgrades the handle and creates a `WeakHandle`.
@@ -144,14 +151,27 @@ pub trait Loader: Send + Sync {
     fn load_asset<T: TypeUuid>(&self, id: AssetUuid) -> Handle<T>;
     fn get_load(&self, id: AssetUuid) -> Option<WeakHandle>;
     fn get_load_status(&self, id: AssetUuid) -> LoadStatus {
-        self.get_load(id).map(|h| self.get_load_status_handle(h.get_load_handle())).unwrap_or(LoadStatus::NotRequested)
+        self.get_load(id)
+            .map(|h| self.get_load_status_handle(h.get_load_handle()))
+            .unwrap_or(LoadStatus::NotRequested)
     }
     fn get_load_status_handle(&self, handle: &LoadHandle) -> LoadStatus;
-    fn get_asset<'a, T: Asset + TypeUuid>(&self, id: AssetUuid, storage: &'a AssetStorage<T>) -> Option<&'a T> {
+    fn get_asset<'a, T: Asset + TypeUuid>(
+        &self,
+        id: AssetUuid,
+        storage: &'a AssetStorage<T>,
+    ) -> Option<&'a T> {
         // TODO validate type for load
-        self.get_load(id).as_ref().map(|h| storage.get(h)).unwrap_or(None)
+        self.get_load(id)
+            .as_ref()
+            .map(|h| storage.get(h))
+            .unwrap_or(None)
     }
-    fn get_asset_mut<'a, T: Asset + TypeUuid>(&self, id: AssetUuid, storage: &'a mut AssetStorage<T>) -> Option<&'a mut T> {
+    fn get_asset_mut<'a, T: Asset + TypeUuid>(
+        &self,
+        id: AssetUuid,
+        storage: &'a mut AssetStorage<T>,
+    ) -> Option<&'a mut T> {
         // TODO validate type for load
         if let Some(h) = self.get_load(id).as_ref() {
             storage.get_mut(h)
@@ -174,9 +194,7 @@ pub struct LoaderWithStorage<T: AtelierLoader<HandleType = ()> + Send + Sync> {
     ref_sender: Arc<Sender<RefOp>>,
     ref_receiver: Receiver<RefOp>,
 }
-impl<T: AtelierLoader<HandleType = ()> + Send + Sync + Default> Default
-    for LoaderWithStorage<T>
-{
+impl<T: AtelierLoader<HandleType = ()> + Send + Sync + Default> Default for LoaderWithStorage<T> {
     fn default() -> Self {
         let (tx, rx) = unbounded();
         Self {
@@ -220,32 +238,37 @@ impl<T: AtelierLoader<HandleType = ()> + Send + Sync> Loader for LoaderWithStora
 
 pub trait AssetTypeStorage {
     fn allocate(&self, handle: &LoadHandle) -> ();
-    fn update_asset(&self, handle: &LoadHandle, data: &dyn AsRef<[u8]>)
-        -> Result<(), Box<dyn Error>>;
-    fn is_loaded(&self, handle: &LoadHandle) -> bool;
-    fn free(&self, handle: LoadHandle);
-}
-impl<A: Asset> AssetTypeStorage for (&ProcessingQueue<A::Data>, &AssetStorage<A>)
-where
-    for<'a> A::Data: Deserialize<'a> + TypeUuid,
-{
-    fn allocate(&self, load_handle: &LoadHandle) -> () {
-
-    }
     fn update_asset(
         &self,
         handle: &LoadHandle,
         data: &dyn AsRef<[u8]>,
+        load_op: AssetLoadOp,
+        version: u32,
+    ) -> Result<(), Box<dyn Error>>;
+    fn commit_asset_version(&mut self, handle: &LoadHandle, version: u32);
+    fn free(&mut self, handle: LoadHandle);
+}
+impl<A: Asset> AssetTypeStorage for (&ProcessingQueue<A::Data>, &mut AssetStorage<A>)
+where
+    for<'a> A::Data: Deserialize<'a> + TypeUuid,
+{
+    fn allocate(&self, load_handle: &LoadHandle) -> () {}
+    fn update_asset(
+        &self,
+        handle: &LoadHandle,
+        data: &dyn AsRef<[u8]>,
+        load_op: AssetLoadOp,
+        version: u32,
     ) -> Result<(), Box<dyn Error>> {
         let asset = bincode::deserialize::<A::Data>(data.as_ref())?;
-        self.0.enqueue(*handle, asset);
+        self.0.enqueue(*handle, asset, load_op, version);
         Ok(())
     }
-    fn is_loaded(&self, handle: &LoadHandle) -> bool {
-        self.1.is_loaded(&WeakHandle::new(*handle))
+    fn commit_asset_version(&mut self, handle: &LoadHandle, version: u32) {
+        self.1.commit_asset(handle, version);
     }
-    fn free(&self, handle: LoadHandle) {
-
+    fn free(&mut self, handle: LoadHandle) {
+        self.1.remove_asset(handle);
     }
 }
 
@@ -288,14 +311,19 @@ impl<'a> WorldStorages<'a> {
 
 impl<'a> atelier_loader::AssetStorage for WorldStorages<'a> {
     type HandleType = ();
-    fn allocate(&self, asset_type: &AssetTypeId, id: &AssetUuid, load_handle: &LoadHandle) -> Self::HandleType {
+    fn allocate(
+        &self,
+        asset_type: &AssetTypeId,
+        id: &AssetUuid,
+        load_handle: &LoadHandle,
+    ) -> Self::HandleType {
         let mut handle = None;
         (self
             .storage_map
             .storages_by_data_uuid
             .get(asset_type)
             .expect("could not find asset type")
-            .with_storage)(self.res, &mut |storage: &dyn AssetTypeStorage| {
+            .with_storage)(self.res, &mut |storage: &mut dyn AssetTypeStorage| {
             handle = Some(storage.allocate(load_handle));
         });
         handle.unwrap()
@@ -306,31 +334,49 @@ impl<'a> atelier_loader::AssetStorage for WorldStorages<'a> {
         handle: &Self::HandleType,
         data: &dyn AsRef<[u8]>,
         load_handle: &LoadHandle,
+        load_op: AssetLoadOp,
+        version: u32,
     ) -> Result<(), Box<dyn Error>> {
+        use std::cell::RefCell; // can't move into closure, so we work around it with a RefCell + Option
+        let moved_op = RefCell::new(Some(load_op));
         let mut result = None;
         (self
             .storage_map
             .storages_by_data_uuid
             .get(asset_type)
             .expect("could not find asset type")
-            .with_storage)(self.res, &mut |storage: &dyn AssetTypeStorage| {
-            result = Some(storage.update_asset(load_handle, data));
+            .with_storage)(self.res, &mut |storage: &mut dyn AssetTypeStorage| {
+            result = Some(storage.update_asset(
+                load_handle,
+                data,
+                moved_op.replace(None).unwrap(),
+                version,
+            ));
         });
         result.unwrap()
     }
-    fn is_loaded(&self, asset_type: &AssetTypeId, storage_handle: &Self::HandleType, load_handle: &LoadHandle) -> bool {
-        let mut loaded = None;
+    fn commit_asset_version(
+        &self,
+        asset_type: &AssetTypeId,
+        handle: &Self::HandleType,
+        load_handle: &LoadHandle,
+        version: u32,
+    ) {
         (self
             .storage_map
             .storages_by_data_uuid
             .get(asset_type)
             .expect("could not find asset type")
-            .with_storage)(self.res, &mut |storage: &dyn AssetTypeStorage| {
-            loaded = Some(storage.is_loaded(load_handle))
+            .with_storage)(self.res, &mut |storage: &mut dyn AssetTypeStorage| {
+            storage.commit_asset_version(load_handle, version);
         });
-        loaded.unwrap()
     }
-    fn free(&self, asset_type: &AssetTypeId, storage_handle: Self::HandleType, load_handle: LoadHandle) {
+    fn free(
+        &self,
+        asset_type: &AssetTypeId,
+        storage_handle: Self::HandleType,
+        load_handle: LoadHandle,
+    ) {
         use std::cell::RefCell; // can't move into closure, so we work around it with a RefCell + Option
         let moved_handle = RefCell::new(Some(load_handle));
         (self
@@ -338,7 +384,7 @@ impl<'a> atelier_loader::AssetStorage for WorldStorages<'a> {
             .storages_by_data_uuid
             .get(asset_type)
             .expect("could not find asset type")
-            .with_storage)(self.res, &mut |storage: &dyn AssetTypeStorage| {
+            .with_storage)(self.res, &mut |storage: &mut dyn AssetTypeStorage| {
             storage.free(moved_handle.replace(None).unwrap())
         });
     }
@@ -348,7 +394,7 @@ pub struct AssetType {
     pub data_uuid: AssetTypeId,
     pub asset_uuid: AssetTypeId,
     pub create_storage: fn(&mut Resources),
-    pub with_storage: fn(&Resources, &mut dyn FnMut(&dyn AssetTypeStorage)),
+    pub with_storage: fn(&Resources, &mut dyn FnMut(&mut dyn AssetTypeStorage)),
 }
 impl std::fmt::Debug for AssetType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -376,7 +422,12 @@ where
                 res.insert(ProcessingQueue::<A::Data>::default())
             }
         },
-        with_storage: |res, func| func(&(&*res.fetch::<ProcessingQueue<A::Data>>(), &*res.fetch::<AssetStorage<A>>())),
+        with_storage: |res, func| {
+            func(&mut (
+                &*res.fetch::<ProcessingQueue<A::Data>>(),
+                &mut *res.fetch_mut::<AssetStorage<A>>(),
+            ))
+        },
     }
 }
 
@@ -390,7 +441,6 @@ macro_rules! asset_type {
         }
     };
     ($($intermediate:ty => $asset:ty),*) => {
-        //mod asset_type_mod {
             use $crate::inventory;
             use $crate::create_asset_type;
             use super::*;
@@ -399,6 +449,5 @@ macro_rules! asset_type {
                     create_asset_type::<$asset>()
                 }
             )*
-        //}
     }
 }

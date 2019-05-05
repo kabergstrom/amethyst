@@ -1,7 +1,7 @@
 //! Rendering system.
 //!
 
-use std::{mem};
+use std::mem;
 
 use derivative::Derivative;
 use log::error;
@@ -10,7 +10,7 @@ use winit::{DeviceEvent, Event, WindowEvent};
 #[cfg(feature = "profiler")]
 use thread_profiler::profile_scope;
 
-use amethyst_assets::{AssetStorage};
+use amethyst_assets::AssetStorage;
 use amethyst_core::{
     shrev::EventChannel,
     specs::prelude::{Resources, RunNow, SystemData, Write, WriteExpect},
@@ -19,7 +19,9 @@ use amethyst_core::{
 use crate::{
     config::DisplayConfig,
     error::Result,
-    formats::{RendyMesh, Factory, create_mesh_asset, create_texture_asset, create_rendy_mesh_asset},
+    formats::{
+        create_mesh_asset, create_rendy_mesh_asset, create_texture_asset, Factory, RendyMesh,
+    },
     mesh::Mesh,
     mtl::{Material, MaterialDefaults},
     pipe::{PipelineBuild, PipelineData, PolyPipeline},
@@ -99,17 +101,49 @@ where
         &mut self,
         (mut mesh_storage, mut texture_storage, mut rendy_mesh_storage): AssetLoadingData<'_>,
     ) {
-        mesh_storage.process(
-            |d| create_mesh_asset(d, &mut self.renderer),
-        );
+        mesh_storage.process(|d| create_mesh_asset(d, &mut self.renderer));
 
-        texture_storage.process(
-            |d| create_texture_asset(d, &mut self.renderer),
-        );
-        
-        rendy_mesh_storage.process(
-            |d| create_rendy_mesh_asset(d, &mut self.factory),
-        );
+        texture_storage.process(|d| create_texture_asset(d, &mut self.renderer));
+
+        rendy_mesh_storage.process(|d| create_rendy_mesh_asset(d, &mut self.factory));
+    }
+
+    fn new_asset_loading(
+        &mut self,
+        (
+            mut mesh_storage,
+            mut texture_storage,
+            mut rendy_mesh_storage,
+            mut mesh_queue,
+            mut texture_queue,
+            mut rendy_mesh_queue,
+        ): NewAssetLoadingData<'_>,
+    ) {
+        fn cvt_processing_state<A: amethyst_assets::Asset>(
+            s: amethyst_assets::Result<amethyst_assets::ProcessingState<A>>,
+        ) -> amethyst_assets::Result<
+            amethyst_assets::NewProcessingState<<A as amethyst_assets::Asset>::Data, A>,
+        > {
+            s.map(|s| match s {
+                amethyst_assets::ProcessingState::Loaded(d) => {
+                    amethyst_assets::NewProcessingState::Loaded(d)
+                }
+                amethyst_assets::ProcessingState::Loading(d) => {
+                    amethyst_assets::NewProcessingState::Loading(d)
+                }
+            })
+        }
+        mesh_queue.process(&mut mesh_storage, |d| {
+            cvt_processing_state(create_mesh_asset(d, &mut self.renderer))
+        });
+
+        texture_queue.process(&mut texture_storage, |d| {
+            cvt_processing_state(create_texture_asset(d, &mut self.renderer))
+        });
+
+        rendy_mesh_queue.process(&mut rendy_mesh_storage, |d| {
+            cvt_processing_state(create_rendy_mesh_asset(d, &mut self.factory))
+        });
     }
 
     fn window_management(&mut self, (mut window_messages, mut screen_dimensions): WindowData<'_>) {
@@ -161,6 +195,14 @@ type AssetLoadingData<'a> = (
     Write<'a, AssetStorage<Texture>>,
     Write<'a, AssetStorage<RendyMesh>>,
 );
+type NewAssetLoadingData<'a> = (
+    Write<'a, amethyst_assets::NewAssetStorage<Mesh>>,
+    Write<'a, amethyst_assets::NewAssetStorage<Texture>>,
+    Write<'a, amethyst_assets::NewAssetStorage<RendyMesh>>,
+    Write<'a, amethyst_assets::ProcessingQueue<<Mesh as amethyst_assets::Asset>::Data>>,
+    Write<'a, amethyst_assets::ProcessingQueue<<Texture as amethyst_assets::Asset>::Data>>,
+    Write<'a, amethyst_assets::ProcessingQueue<<RendyMesh as amethyst_assets::Asset>::Data>>,
+);
 
 type WindowData<'a> = (Write<'a, WindowMessages>, WriteExpect<'a, ScreenDimensions>);
 
@@ -180,6 +222,7 @@ where
             #[cfg(feature = "profiler")]
             profile_scope!("render_system_assetloading");
             self.asset_loading(AssetLoadingData::fetch(res));
+            self.new_asset_loading(NewAssetLoadingData::fetch(res));
         }
         {
             #[cfg(feature = "profiler")]
@@ -195,6 +238,7 @@ where
 
     fn setup(&mut self, res: &mut Resources) {
         AssetLoadingData::setup(res);
+        NewAssetLoadingData::setup(res);
         WindowData::setup(res);
         RenderData::<P>::setup(res);
 

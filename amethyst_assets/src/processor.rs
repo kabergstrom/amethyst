@@ -10,22 +10,20 @@ use crossbeam::queue::SegQueue;
 use derivative::Derivative;
 use hibitset::BitSet;
 use log::{debug, error, trace, warn};
+use atelier_loader::AssetLoadOp;
 
-use amethyst_core::{
-    specs::{
-        prelude::{Component, System, DenseVecStorage, Write},
-        storage::UnprotectedStorage,
-    },
+use amethyst_core::specs::{
+    prelude::{Component, DenseVecStorage, System, Write},
+    storage::UnprotectedStorage,
 };
 
 use crate::{
     asset::{Asset, FormatValue},
     error::{Error, ErrorKind, Result, ResultExt},
+    new_loader::LoadHandle,
     new_storage::AssetStorage,
     progress::Tracker,
-    new_loader::LoadHandle,
 };
-
 
 /// A default implementation for an asset processing system
 /// which converts data to assets and maintains the asset storage
@@ -52,14 +50,13 @@ where
     A: Asset,
     A::Data: Into<Result<ProcessingState<A::Data, A>>>,
 {
-    type SystemData = (Write<'a, ProcessingQueue<A::Data>>, 
-                        Write<'a, AssetStorage<A>>);
+    type SystemData = (
+        Write<'a, ProcessingQueue<A::Data>>,
+        Write<'a, AssetStorage<A>>,
+    );
 
     fn run(&mut self, (mut queue, mut storage): Self::SystemData) {
-        queue.process(
-            &mut storage,
-            Into::into,
-        );
+        queue.process(&mut storage, Into::into);
         storage.process_custom_drop(|_| {});
     }
 }
@@ -68,17 +65,17 @@ pub(crate) struct Processed<T> {
     data: Result<T>,
     handle: LoadHandle,
     tracker: Option<Box<dyn Tracker>>,
+    load_op: AssetLoadOp,
+    version: u32,
 }
 
 /// Returned by processor systems, describes the loading state of the asset.
-pub enum ProcessingState<D, A>
-{
+pub enum ProcessingState<D, A> {
     /// Asset is not fully loaded yet, need to wait longer
     Loading(D),
     /// Asset have finished loading, can now be inserted into storage and tracker notified
     Loaded(A),
 }
-
 
 pub struct ProcessingQueue<T> {
     pub(crate) processed: Arc<SegQueue<Processed<T>>>,
@@ -94,21 +91,19 @@ impl<T> Default for ProcessingQueue<T> {
 }
 
 impl<T> ProcessingQueue<T> {
-
     /// Enqueue asset data for processing
-    pub(crate) fn enqueue(&self, handle: LoadHandle, data: T) {
+    pub(crate) fn enqueue(&self, handle: LoadHandle, data: T, load_op: AssetLoadOp, version: u32) {
         self.processed.push(Processed {
             data: Ok(data),
             handle,
             tracker: None,
+            load_op,
+            version,
         })
     }
     /// Process asset data into assets
-    pub fn process<F, A: Asset>(
-        &mut self,
-        storage: &mut AssetStorage<A>,
-        mut f: F,
-    ) where
+    pub fn process<F, A: Asset>(&mut self, storage: &mut AssetStorage<A>, mut f: F)
+    where
         F: FnMut(T) -> Result<ProcessingState<T, A>>,
     {
         {
@@ -117,13 +112,15 @@ impl<T> ProcessingQueue<T> {
                 .get_mut()
                 .expect("The mutex of `requeue` in `AssetStorage` was poisoned");
             while let Some(processed) = self.processed.try_pop() {
-
                 let f = &mut f;
+                log::info!("loaded {}", A::name());
                 match processed {
                     Processed {
                         data,
                         handle,
                         tracker,
+                        load_op,
+                        version,
                     } => {
                         let asset = match data
                             .and_then(|d| f(d))
@@ -156,7 +153,8 @@ impl<T> ProcessingQueue<T> {
                                 // } else if let Some(tracker) = tracker {
                                 //     tracker.success();
                                 // }
-
+                                
+                                load_op.complete();
                                 x
                             }
                             Ok(ProcessingState::Loading(x)) => {
@@ -170,6 +168,8 @@ impl<T> ProcessingQueue<T> {
                                     data: Ok(x),
                                     handle,
                                     tracker,
+                                    load_op,
+                                    version,
                                 });
                                 continue;
                             }
@@ -184,12 +184,12 @@ impl<T> ProcessingQueue<T> {
                                 // if let Some(tracker) = tracker {
                                 //     tracker.fail(handle, A::name(), name, e);
                                 // }
-                                // TODO figure out how to communicate the failure to the Loader
+                                load_op.error(e);
 
                                 continue;
                             }
                         };
-                        storage.update_asset(&handle, asset);
+                        storage.update_asset(&handle, asset, version);
                     }
                 };
             }

@@ -37,8 +37,8 @@ pub use crate::{
     formats::{
         build_mesh_with_combo, create_mesh_asset, create_texture_asset, BmpFormat,
         ComboMeshCreator, GraphicsPrefab, ImageData, JpgFormat, MaterialPrefab, MeshCreator,
-        MeshData, ObjFormat, PngFormat, TextureData, TextureFormat, TextureMetadata, TexturePrefab,
-        TgaFormat, RendyMesh,
+        MeshData, ObjFormat, PngFormat, RendyMesh, TextureData, TextureFormat, TextureMetadata,
+        TexturePrefab, TgaFormat,
     },
     hidden::{Hidden, HiddenPropagate},
     hide_system::HideHierarchySystem,
@@ -86,6 +86,25 @@ pub use crate::{
     visibility::{Visibility, VisibilitySortingSystem},
 };
 
+#[cfg(feature = "opengl")]
+use gfx_device_gl;
+
+#[cfg(feature = "opengl")]
+use gfx_window_glutin;
+
+#[cfg(feature = "opengl")]
+use glutin;
+
+use gfx;
+use gfx_core;
+use rayon;
+use shred;
+use wavefront_obj;
+use winit;
+
+use amethyst_core;
+
+pub mod encoding;
 pub mod error;
 pub mod mouse;
 pub mod pipe;
