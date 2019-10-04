@@ -1,6 +1,6 @@
 [package]
 name = "amethyst_core"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["Simon Rönnberg <seamonr@gmail.com>"]
 edition = "2018"
 description = "Amethyst core"
@@ -27,14 +27,14 @@ rayon = "1.1.0"
 serde = { version = "1", features = ["derive"] }
 specs = { version = "0.15.1", default-features = false, features = ["shred-derive", "specs-derive"] }
 specs-hierarchy = { version = "0.5.1", default-features = false }
-getset = "0.0.7"
+getset = "0.0.8"
 derive-new = "0.5.6"
 derivative = "1.0"
 
 thread_profiler = { version = "0.3", optional = true }
 
 [dev-dependencies]
-amethyst = { path = "..", version = "0.13.0" }
+amethyst = { path = "..", version = "0.13.1" }
 ron = "0.5.1"
 
 [features]
