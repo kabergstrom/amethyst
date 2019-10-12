@@ -3,6 +3,7 @@
 //! MUST be non-blocking in order to play nicely with the ECS scheduler.
 
 pub mod laminar;
+pub mod memory;
 pub mod tcp;
 pub mod udp;
 
@@ -24,17 +25,14 @@ pub struct TransportResource {
     frame_budget_bytes: i32,
     latency_nanos: i64,
     packet_loss: f32,
+    #[cfg(feature = "monkey")]
+    monkey: Option<monkey::NetworkMonkey>,
 }
 
 impl TransportResource {
     /// Creates a new `TransportResource`.
     pub fn new() -> Self {
-        Self {
-            messages: VecDeque::new(),
-            frame_budget_bytes: 0,
-            latency_nanos: 0,
-            packet_loss: 0.0,
-        }
+        Self::default()
     }
 
     /// Returns estimated number of bytes you can reliably send this frame.
@@ -77,6 +75,12 @@ impl TransportResource {
         self.packet_loss = loss;
     }
 
+    /// Sets the "network monkey" that simulates latency and loss.
+    #[cfg(feature = "monkey")]
+    pub fn set_monkey(&mut self, monkey: Option<monkey::NetworkMonkey>) {
+        self.monkey = monkey;
+    }
+
     /// Creates a `Message` with the default guarantees provided by the `Socket` implementation and
     /// pushes it onto the messages queue to be sent on next sim tick.
     pub fn send(&mut self, destination: SocketAddr, payload: &[u8]) {
@@ -108,6 +112,17 @@ impl TransportResource {
         timing: UrgencyRequirement,
     ) {
         let message = Message::new(destination, payload, delivery, timing);
+        #[cfg(feature = "monkey")]
+        {
+            if let Some(monkey) = self.monkey.as_mut() {
+                if let Some(message) = monkey.mess(message) {
+                    self.messages.push_back(message);
+                }
+            } else {
+                self.messages.push_back(message);
+            }
+        }
+        #[cfg(not(feature = "monkey"))]
         self.messages.push_back(message);
     }
 
@@ -149,6 +164,15 @@ impl TransportResource {
         }
         drained
     }
+
+    #[cfg(feature = "monkey")]
+    pub fn update_monkey(&mut self, time: &amethyst_core::Time) {
+        if let Some(monkey) = self.monkey.as_mut() {
+            for msg in monkey.get_delayed(time) {
+                self.messages.push_front(msg);
+            }
+        }
+    }
 }
 
 impl Default for TransportResource {
@@ -158,6 +182,106 @@ impl Default for TransportResource {
             frame_budget_bytes: 0,
             latency_nanos: 0,
             packet_loss: 0.0,
+            #[cfg(feature = "monkey")]
+            monkey: None,
+        }
+    }
+}
+
+#[cfg(feature = "monkey")]
+pub mod monkey {
+    use super::*;
+    use rand::SeedableRng;
+    struct QueuedMessage {
+        msg: Message,
+        delay: Option<std::time::Duration>, // to avoid requiring Time in send, we just generate delay first
+        deadline: Option<std::time::Duration>,
+    }
+
+    pub struct NetworkMonkey {
+        queue: VecDeque<QueuedMessage>,
+        min_latency: Option<f32>,
+        max_latency: Option<f32>,
+        loss_percentage: Option<f32>,
+        // to avoid type generics in the TransportResource this is a dyn with specific seed
+        rng: rand::rngs::SmallRng,
+    }
+
+    impl NetworkMonkey {
+        pub fn new(seed: [u8; 16]) -> Self {
+            Self {
+                queue: VecDeque::new(),
+                min_latency: None,
+                max_latency: None,
+                loss_percentage: None,
+                rng: rand::rngs::SmallRng::from_seed(seed),
+            }
+        }
+
+        pub fn set_min_latency(&mut self, latency: Option<f32>) {
+            self.min_latency = latency;
+        }
+
+        pub fn set_max_latency(&mut self, latency: Option<f32>) {
+            self.max_latency = latency;
+        }
+
+        pub fn set_loss_percentage(&mut self, loss: Option<f32>) {
+            self.loss_percentage = loss;
+        }
+
+        pub fn mess(&mut self, message: Message) -> Option<Message> {
+            use rand::Rng;
+            if self.rng.gen::<f32>() > self.loss_percentage.unwrap_or(0.) {
+                let min_range = self.min_latency.unwrap_or(self.max_latency.unwrap_or(0.));
+                let max_range = self.max_latency.unwrap_or(self.min_latency.unwrap_or(0.));
+                let mut delay = if min_range == max_range {
+                    min_range
+                } else {
+                    let range = max_range - min_range;
+                    let deviation = range * 0.5;
+                    let mid = max_range - deviation;
+                    self.rng.sample(rand::distributions::Normal::new(
+                        mid as f64,
+                        deviation as f64,
+                    )) as f32
+                };
+                if delay < 0. {
+                    delay = 0.;
+                }
+                if delay == 0. {
+                    Some(message)
+                } else {
+                    let queued = QueuedMessage {
+                        msg: message,
+                        delay: Some(std::time::Duration::from_secs_f32(delay)),
+                        deadline: None,
+                    };
+                    self.queue.push_back(queued);
+                    None
+                }
+            } else {
+                None // drop due to loss
+            }
+        }
+
+        pub fn get_delayed(&mut self, time: &amethyst_core::Time) -> Vec<Message> {
+            let mut to_return = Vec::new();
+            for i in (0..self.queue.len()).rev() {
+                let msg = &mut self.queue[i];
+                if let Some(delay) = std::mem::replace(&mut msg.delay, None) {
+                    msg.deadline = Some(time.absolute_time() + delay);
+                }
+                if msg
+                    .deadline
+                    .map(|t| t <= time.absolute_time())
+                    .unwrap_or(false)
+                {
+                    let msg = self.queue.remove(i).expect("failed to remove item");
+                    to_return.push(msg.msg);
+                }
+            }
+            to_return
         }
     }
 }

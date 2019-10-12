@@ -50,7 +50,7 @@ where
 {
     /// The world
     #[derivative(Debug = "ignore")]
-    world: World,
+    pub world: World,
     #[derivative(Debug = "ignore")]
     reader: R,
     #[derivative(Debug = "ignore")]
@@ -214,6 +214,18 @@ where
         ApplicationBuilder::new(path, initial_state)
     }
 
+    pub fn step(&mut self, elapsed_time: Duration)
+    where
+        for<'b> R: EventReader<'b, Event = E>,
+    {
+        self.advance_frame();
+        {
+            let mut time = self.world.write_resource::<Time>();
+            time.increment_frame_number();
+            time.set_delta_time(elapsed_time);
+        }
+    }
+
     /// Run the gameloop until the game state indicates that the game is no
     /// longer running. This is done via the `State` returning `Trans::Quit` or
     /// `Trans::Pop` on the last state in from the stack. See full
@@ -260,7 +272,7 @@ where
     }
 
     /// Sets up the application.
-    fn initialize(&mut self) {
+    pub fn initialize(&mut self) {
         #[cfg(feature = "profiler")]
         profile_scope!("initialize");
         self.states
@@ -385,7 +397,7 @@ where
     }
 
     /// Cleans up after the quit signal is received.
-    fn shutdown(&mut self) {
+    pub fn shutdown(&mut self) {
         info!("Engine is shutting down");
         self.data.dispose(&mut self.world);
     }

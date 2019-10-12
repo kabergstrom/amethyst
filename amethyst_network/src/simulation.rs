@@ -12,4 +12,6 @@ pub use events::NetworkSimulationEvent;
 pub use message::Message;
 pub use requirements::{DeliveryRequirement, UrgencyRequirement};
 pub use timing::{NetworkSimulationTime, NetworkSimulationTimeSystem};
-pub use transport::{laminar, tcp, udp, TransportResource};
+#[cfg(feature = "monkey")]
+pub use transport::monkey::NetworkMonkey;
+pub use transport::{laminar, memory, tcp, udp, TransportResource};
