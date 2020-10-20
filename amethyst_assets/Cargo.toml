@@ -40,20 +40,18 @@ objekt = "0.1.2"
 erased-serde = "0.3.9"
 inventory = "0.1.5"
 lazy_static = "1.4"
-atelier-loader = { git = "https://github.com/amethyst/atelier-assets.git", optional = true }
-atelier-importer = { git = "https://github.com/amethyst/atelier-assets.git", optional = true }
-uuid = { version = "0.7", optional = true }
-bincode = { version = "1.1", optional = true }
+atelier-loader = { git = "https://github.com/amethyst/atelier-assets.git", branch = "indirect_handles" }
+atelier-importer = { git = "https://github.com/amethyst/atelier-assets.git", branch = "indirect_handles" }
+uuid = "0.7"
+bincode = "1.1"
 type-uuid = "0.1"
 
 [dev-dependencies]
 serde_json = "1"
 
 # I want this to be an optional dev-dependency, but it's not possible :(
-atelier-daemon = { git = "https://github.com/amethyst/atelier-assets.git", default-features = false }
+atelier-daemon = { git = "https://github.com/amethyst/atelier-assets.git", branch = "indirect_handles", default-features = false }
 
 [features]
 profiler = [ "thread_profiler/thread_profiler" ]
 json = [ "serde_json" ]
-float64 = ["amethyst_core/float64"]
-experimental-assets = ["atelier-importer", "atelier-loader", "bincode", "uuid"]
