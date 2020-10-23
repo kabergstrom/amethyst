@@ -56,7 +56,12 @@ pub mod experimental {
     pub use atelier_loader::asset_uuid;
     pub use atelier_loader::handle::{AssetHandle, GenericHandle, Handle};
 }
-
+pub use atelier_loader::handle::{AssetHandle, GenericHandle, Handle, WeakHandle};
+pub use loader_new::{create_asset_type, AssetUuid, DefaultLoader, LoadStatus, Loader};
+pub use processor::{
+    add_default_asset_processor_system_to_dispatcher, ProcessingQueue, ProcessingState,
+};
+pub use storage_new::AssetStorage;
 // used in macros. Private API otherwise.
 #[doc(hidden)]
 pub use crate::dyn_format::{DeserializeFn, Registry};
